@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { getBreedOptionsForCategory, LIVESTOCK_CATEGORY_OPTIONS, normalizeBreedValue } from '@/lib/livestock-breed-options';
 
 import { FinancialInitializationModal } from '@/components/modals/FinancialInitializationModal';
-import { LivestockType } from '@prisma/client';
+import { LivestockType } from '@/lib/enums';
 import { createHouse } from '@/lib/actions/dashboard-actions';
 import { Dialog } from '@/components/ui/Dialog';
 import { toast } from 'sonner';
@@ -147,13 +147,13 @@ export function RegisterBatchForm({ houses, onSuccess }: RegisterBatchFormProps)
         type: data.type,
       });
 
-      if (result.success && result.id) {
+      if (result.success && 'id' in result && result.id) {
         setCreatedBatchId(result.id.toString());
         setCreatedBatchName(data.batchName);
         setShowFinModal(true);
         router.refresh();
       } else {
-        alert("Error: " + result.error);
+        alert("Error: " + (('error' in result && result.error) || 'Failed to create batch'));
       }
     } catch (error) {
       alert("An unexpected error occurred.");

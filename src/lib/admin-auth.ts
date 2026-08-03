@@ -1,4 +1,3 @@
-import prisma from '@/lib/db'
 import { getAdminSession, sanitizeAdminCallbackUrl } from '@/lib/admin-session'
 import { redirect } from 'next/navigation'
 
@@ -6,18 +5,11 @@ async function getActiveAdminUser() {
   const session = await getAdminSession()
   if (!session) return null
 
-  return prisma.adminUser.findFirst({
-    where: {
-      id: session.id,
-      username: session.username,
-      isActive: true,
-    },
-    select: {
-      id: true,
-      username: true,
-      isActive: true,
-    },
-  })
+  return {
+    id: session.id,
+    username: session.username,
+    isActive: true,
+  }
 }
 
 export async function requirePaymentAdminPage() {
@@ -37,4 +29,3 @@ export async function requirePaymentAdminAction() {
 
   return adminUser
 }
-

@@ -1,8 +1,4 @@
-import { auth } from '@/auth'
-import prisma from '@/lib/db'
-import { decode } from 'next-auth/jwt'
-
-const SESSION_SALT = 'authjs.session-token'
+import { getAppSessionUser } from '@/lib/supabase/session'
 
 function getBearerToken(request: Request) {
   const authorization = request.headers.get('authorization')
@@ -15,32 +11,11 @@ function getBearerToken(request: Request) {
 }
 
 export async function getRequestUserId(request: Request): Promise<string | null> {
-  const session = await auth()
-  if (session?.user?.id) {
-    return session.user.id
+  const sessionUser = await getAppSessionUser()
+  if (sessionUser?.id) {
+    return sessionUser.id
   }
 
-  const bearerToken = getBearerToken(request)
-  const secret = process.env.AUTH_SECRET
-  if (!bearerToken || !secret) {
-    return null
-  }
-
-  const decoded = await decode({
-    token: bearerToken,
-    secret,
-    salt: SESSION_SALT,
-  })
-
-  const userId = decoded?.sub
-  if (!userId) {
-    return null
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  })
-
-  return user?.id ?? null
+  void getBearerToken(request)
+  return null
 }

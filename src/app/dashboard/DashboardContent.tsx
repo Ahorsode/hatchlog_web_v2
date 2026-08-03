@@ -9,7 +9,7 @@ import { Bird, Skull, Wheat, TrendingUp, Activity, Plus, Package, Eye, Banknote,
 import Link from 'next/link';
 import { Dialog } from '@/components/ui/Dialog';
 import { formatCurrency } from '@/lib/utils';
-import { LivestockType, Role, SubscriptionTier } from '@prisma/client';
+import { LivestockType, Role, SubscriptionTier } from '@/lib/enums';
 import { formatLivestockType } from '@/lib/utils/growth-utils';
 import { getBreedDisplayName, normalizeBreedValue } from '@/lib/livestock-breed-options';
 import dynamic from 'next/dynamic';

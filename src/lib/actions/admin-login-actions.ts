@@ -2,7 +2,6 @@
 
 import bcrypt from 'bcryptjs'
 import { headers } from 'next/headers'
-import prisma from '@/lib/db'
 import {
   createAdminSession,
   destroyAdminSession,
@@ -26,6 +25,15 @@ type AdminLoginResult =
       success: false
       error: string
     }
+
+function getEnvAdminCredentials() {
+  const username = process.env.HATCHLOG_ADMIN_USERNAME
+  const passwordHash = process.env.HATCHLOG_ADMIN_PASSWORD_HASH
+  const id = process.env.HATCHLOG_ADMIN_ID || 'env-admin-001'
+
+  if (!username || !passwordHash) return null
+  return { id, username, passwordHash }
+}
 
 export async function loginAdmin(input: unknown): Promise<AdminLoginResult> {
   try {
@@ -59,37 +67,28 @@ export async function loginAdmin(input: unknown): Promise<AdminLoginResult> {
 
     const { username, password, callbackUrl } = parsed.data
 
-    const adminUser = await prisma.adminUser.findFirst({
-      where: {
-        username,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        username: true,
-        passwordHash: true,
-      },
-    })
+    const envAdmin = getEnvAdminCredentials()
 
-    const passwordMatches = adminUser
-      ? await bcrypt.compare(password, adminUser.passwordHash)
-      : false
-
-    if (!adminUser || !passwordMatches) {
+    if (!envAdmin) {
       return {
         success: false,
-        error: 'Invalid admin username or password',
+        error: 'Admin login is not configured. Set HATCHLOG_ADMIN_USERNAME and HATCHLOG_ADMIN_PASSWORD_HASH.',
       }
     }
 
-    await prisma.adminUser.update({
-      where: { id: adminUser.id },
-      data: { lastLoginAt: new Date() },
-    })
+    if (envAdmin.username !== username) {
+      return { success: false, error: 'Invalid admin username or password' }
+    }
+
+    const passwordMatches = await bcrypt.compare(password, envAdmin.passwordHash)
+
+    if (!passwordMatches) {
+      return { success: false, error: 'Invalid admin username or password' }
+    }
 
     await createAdminSession({
-      id: adminUser.id,
-      username: adminUser.username,
+      id: envAdmin.id,
+      username: envAdmin.username,
     })
 
     return {
@@ -101,7 +100,7 @@ export async function loginAdmin(input: unknown): Promise<AdminLoginResult> {
 
     return {
       success: false,
-      error: 'Admin login is not ready yet. Please run the database migration and try again.',
+      error: 'Admin login failed. Please check environment configuration and try again.',
     }
   }
 }

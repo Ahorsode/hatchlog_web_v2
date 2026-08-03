@@ -1,10 +1,8 @@
 import React, { Suspense } from 'react';
-import prisma from '@/lib/db';
-import { auth } from '@/auth';
 import { SettingsContent } from './SettingsContent';
 import { getAuthContext } from '@/lib/auth-utils';
 import { Settings } from 'lucide-react';
-import { feedCategoryFilter } from '@/lib/inventory/feed-categories';
+import { getFarm, listInventory } from '@/lib/hatchlog-api';
 
 export default async function SettingsPage() {
   const { userId, activeFarmId } = await getAuthContext();
@@ -13,25 +11,15 @@ export default async function SettingsPage() {
     return <div>Unauthorized</div>;
   }
 
-  const farm = await prisma.farm.findFirst({
-    where: {
-      OR: [
-        { userId },
-        { members: { some: { userId } } }
-      ]
-    }
-  });
+  const farm = activeFarmId ? await getFarm(activeFarmId).catch(() => null) : null;
 
   const inventory = activeFarmId
-    ? await prisma.inventory.findMany({
-        where: { farmId: activeFarmId, isDeleted: false, category: feedCategoryFilter() },
-        orderBy: { itemName: 'asc' },
-      })
+    ? await listInventory(activeFarmId, { category: 'FEED' }).catch(() => [])
     : [];
 
-  const serializedInventory = inventory.map((item: any) => ({
+  const serializedInventory = (Array.isArray(inventory) ? inventory : []).map((item: any) => ({
     ...item,
-    stockLevel: Number(item.stockLevel),
+    stockLevel: Number(item.stockLevel || 0),
     reorderLevel: item.reorderLevel ? Number(item.reorderLevel) : undefined,
     costPerUnit: item.costPerUnit ? Number(item.costPerUnit) : undefined,
   }));

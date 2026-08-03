@@ -2,12 +2,12 @@ import React from 'react';
 import { checkWorkerPermissions } from '@/lib/actions/staff-actions';
 import { redirect } from 'next/navigation';
 import { getAuthContext } from '@/lib/auth-utils';
-import prisma from '@/lib/db';
 import { getFinancialTransactions } from '@/lib/actions/financial-transaction-actions';
 import { FinanceHubClient } from './FinanceHubClient';
 import { MissingCostPrompt } from '@/components/finance/MissingCostPrompt';
 import { MissingHealthCostPrompt } from '@/components/finance/MissingHealthCostPrompt';
 import { getHealthItemsMissingCost, repairMissingHealthStockExpenses } from '@/lib/actions/health-actions';
+import { listLivestock } from '@/lib/hatchlog-api';
 
 export default async function FinancePage() {
   const { activeFarmId } = await getAuthContext();
@@ -23,26 +23,23 @@ export default async function FinancePage() {
     redirect('/dashboard/unauthorized');
   }
 
-  // Check for active batches with missing costs
-  const missingCostBatches = canEdit ? await (prisma.livestock as any).findMany({
-    where: {
-      farmId: activeFarmId,
-      status: 'active',
-      isDeleted: false,
-      OR: [
-        { initialCostActual: null },
-        { initialCostActual: 0 }
-      ]
-    },
-    select: {
-      id: true,
-      batchName: true,
-      initialCount: true,
-      type: true
+  let missingCostBatches: any[] = [];
+  if (canEdit) {
+    try {
+      const allBatches = (await listLivestock(activeFarmId, { status: 'active' })) as any[];
+      missingCostBatches = (Array.isArray(allBatches) ? allBatches : []).filter(
+        (b: any) => !b.initialCostActual || Number(b.initialCostActual) === 0,
+      ).map((b: any) => ({
+        id: b.id,
+        batchName: b.batchName,
+        initialCount: b.initialCount,
+        type: b.type,
+      }));
+    } catch {
+      missingCostBatches = [];
     }
-  }) : [];
+  }
 
-  // Health stock (vaccines/medications) a worker added without a cost.
   const missingHealthCosts = canEdit ? await getHealthItemsMissingCost() : [];
 
   if (canEdit) {

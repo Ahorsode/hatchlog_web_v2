@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Phone, ArrowRight, Loader2, Bird, User, Mail, Lock } from 'lucide-react';
 import Background3D from '@/components/auth/Background3D';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password-policy';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -56,15 +56,19 @@ export default function SignUpPage() {
         throw new Error(data.message || 'Registration failed');
       }
 
-      // After successful registration, sign in
-      const signinRes = await signIn('credentials', {
-        identifier: formData.phoneNumber,
-        password: formData.password,
-        redirect: false,
+      const loginRes = await fetch('/api/auth/supabase-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: formData.phoneNumber,
+          password: formData.password,
+        }),
       });
-      
-      if (signinRes?.error) {
-        setError('Account created but login failed. Please go to login page.');
+
+      const loginData = await loginRes.json().catch(() => ({}));
+
+      if (!loginRes.ok) {
+        setError(loginData.message || 'Account created but login failed. Please go to login page.');
         setIsLoading(false);
       } else {
         setSuccess(true);
@@ -79,10 +83,24 @@ export default function SignUpPage() {
     }
   };
 
-  const handleGoogleSignUp = () => {
+  const handleGoogleSignUp = async () => {
     if (isLoading) return;
     setIsLoading(true);
-    signIn('google', { callbackUrl: '/dashboard' });
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const redirectTo = `${window.location.origin}/api/auth/callback?next=/dashboard`;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (oauthError) {
+        setError(oauthError.message || 'Google sign-up failed.');
+        setIsLoading(false);
+      }
+    } catch {
+      setError('Google sign-up failed. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   return (

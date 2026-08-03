@@ -1,16 +1,9 @@
 'use server'
 
-import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { parseFinancialLogDate } from '@/lib/financial-dates'
-import { upsertOrderLedger } from '@/lib/order-ledger-sync'
-
-const MONEY_EPSILON = 0.01
-
-function toMoney(value: number) {
-  return Math.round(value * 100) / 100
-}
+import { recordPaymentApi } from '@/lib/hatchlog-api'
 
 export async function recordPayment(data: {
   customerId: string
@@ -27,74 +20,18 @@ export async function recordPayment(data: {
     return { success: false, error: 'Unauthorized: Only finance staff can record payments' }
   }
 
-  const amount = toMoney(Number(data.amount))
+  const amount = Math.round(Number(data.amount) * 100) / 100
   if (amount <= 0) return { success: false, error: 'Invalid payment amount' }
   const paymentDate = parseFinancialLogDate(data.paymentDate) ?? new Date()
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findFirst({
-        where: { id: data.customerId, farmId: activeFarmId },
-        select: { balanceOwed: true }
-      })
-
-      if (!customer) {
-        throw new Error('Customer not found')
-      }
-
-      const currentBalance = Number(customer.balanceOwed)
-      if (amount - currentBalance > MONEY_EPSILON) {
-        throw new Error('Payment amount exceeds customer balance')
-      }
-
-      await tx.customer.update({
-        where: { id: data.customerId, farmId: activeFarmId },
-        data: {
-          balanceOwed: { decrement: amount }
-        }
-      })
-
-      if (data.orderId) {
-        const order = await tx.order.findFirst({
-          where: { id: data.orderId, farmId: activeFarmId, isDeleted: false },
-          include: { items: true },
-        })
-
-        if (!order) {
-          throw new Error('Order not found')
-        }
-
-        const previousCash = toMoney(Number((order as any).cashReceived || 0))
-        const nextCash = toMoney(previousCash + amount)
-        const totalAmount = toMoney(Number(order.totalAmount))
-        const isPaid = nextCash + MONEY_EPSILON >= totalAmount
-
-        await tx.order.update({
-          where: { id: order.id },
-          data: {
-            cashReceived: nextCash,
-            status: isPaid ? 'PAID' : order.status,
-            ...(isPaid ? { paidAt: paymentDate } : {}),
-          },
-        })
-
-        const itemSummary = order.items
-          .map((item) => `${item.quantity} x ${item.description}`)
-          .join(', ')
-
-        await upsertOrderLedger(tx, {
-          orderId: order.id,
-          farmId: activeFarmId,
-          userId,
-          customerId: order.customerId,
-          totalAmount,
-          cashReceived: nextCash,
-          paymentMethod: data.paymentMethod || order.paymentMethod || 'CASH',
-          paymentReference: order.paymentReference,
-          transactionDate: paymentDate,
-          description: itemSummary || 'Farm-gate sale',
-        })
-      }
+    await recordPaymentApi({
+      farm_id: activeFarmId,
+      customerId: data.customerId,
+      amount,
+      orderId: data.orderId,
+      paymentMethod: data.paymentMethod,
+      paymentDate: paymentDate.toISOString(),
     })
 
     revalidatePath('/dashboard/sales')
@@ -103,11 +40,12 @@ export async function recordPayment(data: {
     revalidatePath('/dashboard/finance')
 
     return { success: true, message: 'Payment recorded successfully' }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error recording payment:', error)
-    if (error instanceof Error && ['Customer not found', 'Payment amount exceeds customer balance', 'Order not found'].includes(error.message)) {
+    const knownErrors = ['Customer not found', 'Payment amount exceeds customer balance', 'Order not found']
+    if (error instanceof Error && knownErrors.some(msg => error.message.includes(msg))) {
       return { success: false, error: error.message }
     }
-    return { success: false, error: 'Failed to record payment' }
+    return { success: false, error: error.message || 'Failed to record payment' }
   }
 }

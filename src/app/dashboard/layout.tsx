@@ -1,49 +1,41 @@
 import React from 'react';
-import { auth } from '@/auth';
-import prisma from '@/lib/db';
+import { getAppSessionUser } from '@/lib/supabase/session';
 import { redirect } from 'next/navigation';
 import { SidebarWrapper } from '@/components/layout/SidebarWrapper';
 import { acceptInvitation } from '@/lib/actions/staff-actions';
 import { resolveFarmNavigationRole } from '@/lib/navigation-permissions';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { hatchlogMe, hatchlogFarms } from '@/lib/hatchlog-api';
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const sessionUser = await getAppSessionUser();
   
-  if (!session?.user?.id) {
+  if (!sessionUser?.id) {
     redirect('/login');
   }
 
-  let dbUser: Awaited<ReturnType<typeof prisma.user.findUnique>>;
-  let farm: Awaited<ReturnType<typeof prisma.farm.findFirst>>;
+  if (sessionUser.mustChangePassword) {
+    redirect('/change-password');
+  }
+
+  let me: any;
+  let farm: any;
 
   try {
-    [dbUser, farm] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: session.user.id }
-      }),
-      prisma.farm.findFirst({
-        where: {
-          OR: [
-            { userId: session.user.id },
-            { members: { some: { userId: session.user.id } } }
-          ]
-        }
-      }),
-    ]);
+    me = await hatchlogMe();
+    const farms = await hatchlogFarms() as any[];
+    farm = Array.isArray(farms) && farms.length > 0 ? farms[0] : null;
   } catch (error) {
-    console.error('[DashboardLayout] Database error:', error);
+    console.error('[DashboardLayout] API error:', error);
     redirect('/login?error=db');
   }
 
-  // If the session references a deleted or non-existent user, stop before
-  // passing an undefined role into the client navigation shell.
-  if (!dbUser) {
+  if (!me) {
     redirect('/login?error=user_not_found');
   }
 
@@ -51,7 +43,6 @@ export default async function DashboardLayout({
 
   if (!farm || isPlaceholder) {
     if (!farm) {
-      // Check if they were invited and accept it automatically!
       let inviteCheck: { success?: boolean } | null = null;
       try {
         inviteCheck = await acceptInvitation(false);
@@ -60,18 +51,17 @@ export default async function DashboardLayout({
       }
 
       if (inviteCheck?.success) {
-        // Force a hard redirect to clear caches and allow DB replication to catch up
         redirect('/dashboard');
       }
     }
 
-    if (dbUser?.role === 'OWNER') {
+    if (me.role === 'OWNER') {
       redirect('/onboarding');
     }
   }
 
-  if ((!farm || isPlaceholder) && dbUser?.role !== 'OWNER') {
-    const identifier = dbUser?.email || (dbUser as any)?.phoneNumber || 'your account';
+  if ((!farm || isPlaceholder) && me.role !== 'OWNER') {
+    const identifier = me.email || me.phoneNumber || 'your account';
     return (
       <div className="min-h-screen flex items-center justify-center bg-black/20 backdrop-blur-xl text-white p-7">
         <div className="glass-morphism p-11 rounded-lg text-center max-w-md">
@@ -95,50 +85,21 @@ export default async function DashboardLayout({
     );
   }
 
-  // If user has a farm but no name yet (invited member on first login), redirect to profile setup
-  if (farm && !dbUser?.firstname && dbUser?.role !== 'OWNER') {
+  if (farm && !me.firstname && me.role !== 'OWNER') {
     redirect('/onboarding/profile');
   }
 
-  let userPermissions = null;
-  let membershipRole: string | null = null;
-  if (farm && dbUser.id) {
-    try {
-      const [permissions, membership] = await Promise.all([
-        (prisma as any).userPermission.findUnique({
-          where: {
-            userId_farmId: {
-              userId: dbUser.id,
-              farmId: farm.id,
-            },
-          },
-        }),
-        prisma.farmMember.findUnique({
-          where: {
-            farmId_userId: {
-              farmId: farm.id,
-              userId: dbUser.id,
-            },
-          },
-          select: { role: true },
-        }),
-      ]);
-      userPermissions = permissions;
-      membershipRole = membership?.role ?? null;
-    } catch (error) {
-      console.error('[DashboardLayout] Permission lookup failed:', error);
-      userPermissions = null;
-    }
-  }
+  const userPermissions = me.permissions || null;
+  const membershipRole = me.role || null;
 
   const navigationRole = farm
     ? resolveFarmNavigationRole({
         farmOwnerId: farm.userId,
-        userId: dbUser.id,
-        userRole: dbUser.role,
+        userId: me.id,
+        userRole: me.role,
         membershipRole,
       })
-    : dbUser.role;
+    : me.role;
 
   const rawFarmName = (farm?.name || 'My').trim();
   const mobileFarmTitle = /\bfarms?\s*$/i.test(rawFarmName)

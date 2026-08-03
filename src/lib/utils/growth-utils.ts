@@ -1,4 +1,4 @@
-import { LivestockType } from '@prisma/client';
+import { LivestockType } from '@/lib/enums';
 
 export interface GrowthPerformance {
   days: number;

@@ -1,5 +1,8 @@
-import prisma from './db';
-import { SubscriptionTier } from '@prisma/client';
+'use server'
+
+import { getFarm, listTeamMembers } from './hatchlog-api'
+
+type SubscriptionTier = 'BASIC' | 'STANDARD' | 'PREMIUM'
 
 export type Feature = 
   | 'PDF_INVOICES'
@@ -33,26 +36,16 @@ const TIER_MAPPING: Record<SubscriptionTier, Feature[]> = {
 const WORKER_LIMITS: Record<SubscriptionTier, number> = {
   BASIC: 2,
   STANDARD: 5,
-  PREMIUM: 1000, // Effectively unlimited
+  PREMIUM: 1000,
 };
 
 export async function getFarmTier(farmId: string): Promise<SubscriptionTier> {
-  const subscription = await prisma.subscription.findUnique({
-    where: { farmId },
-    include: { plan: true }
-  });
-
-  if (subscription) {
-    const now = new Date();
-    const isActive = subscription.status === 'ACTIVE' && (!subscription.endDate || subscription.endDate > now);
-    return isActive ? subscription.plan.tier : SubscriptionTier.BASIC;
+  try {
+    const farm = await getFarm(farmId) as any
+    return (farm?.subscriptionTier as SubscriptionTier) || 'BASIC'
+  } catch {
+    return 'BASIC'
   }
-
-  const farm = await prisma.farm.findUnique({
-    where: { id: farmId },
-    select: { subscriptionTier: true }
-  });
-  return farm?.subscriptionTier || SubscriptionTier.BASIC;
 }
 
 export async function checkFeature(farmId: string, feature: Feature): Promise<boolean> {
@@ -66,19 +59,14 @@ export async function getWorkerLimit(farmId: string): Promise<number> {
 }
 
 export async function canAddWorker(farmId: string): Promise<{ canAdd: boolean; limit: number; current: number }> {
-    const tier = await getFarmTier(farmId);
-    const limit = WORKER_LIMITS[tier];
-    
-    const [membersCount, invitationsCount] = await Promise.all([
-        prisma.farmMember.count({ where: { farmId, role: { not: 'OWNER' } } }),
-        prisma.invitation.count({ where: { farmId, status: 'PENDING' } })
-    ]);
-    
-    const current = membersCount + invitationsCount;
-    
-    return {
-        canAdd: current < limit,
-        limit,
-        current
-    };
+  const tier = await getFarmTier(farmId);
+  const limit = WORKER_LIMITS[tier];
+
+  try {
+    const members = await listTeamMembers(farmId) as any[]
+    const current = Array.isArray(members) ? members.filter((m: any) => m.role !== 'OWNER').length : 0
+    return { canAdd: current < limit, limit, current }
+  } catch {
+    return { canAdd: true, limit, current: 0 }
+  }
 }

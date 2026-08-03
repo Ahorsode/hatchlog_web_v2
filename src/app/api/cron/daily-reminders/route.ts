@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/db'
-import { buildDailyReminderAlerts } from '@/lib/reminders/farm-reminders'
 
 /**
- * Optional cron hook: evaluates daily reminder conditions for all farms.
- * Wire to Vercel Cron or an external scheduler in production.
+ * Phase 2: Daily reminder cron should be moved to the Nest backend scheduler.
+ * This stub returns 410 Gone to indicate it's no longer handled here.
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -14,49 +12,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const now = new Date()
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-
-  const farms = await prisma.farm.findMany({
-    select: { id: true, name: true },
-  })
-
-  const results = []
-
-  for (const farm of farms) {
-    const settings = await prisma.farmSettings.findUnique({ where: { farmId: farm.id } })
-
-    const [eggLogToday, feedLogToday, layerCount] = await Promise.all([
-      prisma.eggProduction.aggregate({
-        where: { farmId: farm.id, logDate: { gte: today } },
-        _sum: { eggsCollected: true },
-      }),
-      prisma.feedingLog.count({
-        where: { farmId: farm.id, logDate: { gte: today }, isDeleted: false },
-      }),
-      prisma.livestock.count({
-        where: { farmId: farm.id, status: 'active', type: 'POULTRY_LAYER' },
-      }),
-    ])
-
-    const alerts = buildDailyReminderAlerts({
-      eggRecordReminderTime: settings?.eggRecordReminderTime,
-      feedRecordReminderTime: settings?.feedRecordReminderTime,
-      hasEggLogToday: (eggLogToday._sum.eggsCollected || 0) > 0,
-      hasFeedLogToday: feedLogToday > 0,
-      activeLayerBatchCount: layerCount,
-      now,
-    })
-
-    if (alerts.length > 0) {
-      results.push({ farmId: farm.id, farmName: farm.name, alerts })
-    }
-  }
-
   return NextResponse.json({
-    evaluatedAt: now.toISOString(),
-    farmsWithAlerts: results.length,
-    results,
+    message: 'Daily reminders are now handled by the Nest backend scheduler.',
+    evaluatedAt: new Date().toISOString(),
+    farmsWithAlerts: 0,
+    results: [],
   })
 }

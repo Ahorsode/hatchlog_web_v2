@@ -1,11 +1,11 @@
 import React from 'react';
 import { getDashboardStats } from '@/lib/actions/dashboard-actions';
 import { DashboardContent } from './DashboardContent';
-import prisma from '@/lib/db';
 import { getAuthContext } from '@/lib/auth-utils';
 import { getMonthlyProductionSummary } from '@/lib/actions/preference-actions';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
 import { redirect } from 'next/navigation';
+import { listHouses, hatchlogMe, getFarm, getFarmSettings } from '@/lib/hatchlog-api';
 
 export default async function DashboardPage() {
   let userId: string;
@@ -36,32 +36,20 @@ export default async function DashboardPage() {
   }
 
   try {
-    const [stats, housesRaw, summary, membership, farm, permissions, farmSettings] = await Promise.all([
+    const [stats, housesRaw, summary, me, farm, farmSettings] = await Promise.all([
       getDashboardStats(),
-      (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-        return await tx.house.findMany({
-          where: { farmId: activeFarmId }
-        });
-      }),
+      listHouses(activeFarmId).catch(() => []),
       getMonthlyProductionSummary(),
-      prisma.farmMember.findUnique({
-        where: { farmId_userId: { farmId: activeFarmId, userId } }
-      }),
-      prisma.farm.findUnique({ where: { id: activeFarmId } }),
-      prisma.userPermission.findUnique({
-        where: { userId_farmId: { userId, farmId: activeFarmId } }
-      }),
-      prisma.farmSettings.findUnique({
-        where: { farmId: activeFarmId }
-      })
+      hatchlogMe().catch(() => null),
+      getFarm(activeFarmId).catch(() => null) as Promise<any>,
+      getFarmSettings(activeFarmId).catch(() => null) as Promise<any>,
     ]);
 
-    const role = userId === farm?.userId ? 'OWNER' : membership?.role || 'WORKER';
+    const role = me?.isFarmOwner ? 'OWNER' : me?.role || 'WORKER';
     const currency = farmSettings?.currency || 'GHS';
     const eggsPerCrate = farmSettings?.eggsPerCrate ?? 30;
     
-    // Serialize Decimal objects to numbers for Client Components
-    const houses = (housesRaw as any[]).map((house: { id: number; name: string; currentTemperature: any; currentHumidity: any }) => ({
+    const houses = (Array.isArray(housesRaw) ? housesRaw : []).map((house: any) => ({
       ...house,
       currentTemperature: house.currentTemperature ? Number(house.currentTemperature) : null,
       currentHumidity: house.currentHumidity ? Number(house.currentHumidity) : null,
@@ -75,7 +63,7 @@ export default async function DashboardPage() {
           summary={summary} 
           role={role as any} 
           subscriptionTier={farm?.subscriptionTier}
-          permissions={permissions}
+          permissions={me?.permissions}
           currency={currency}
           eggsPerCrate={eggsPerCrate}
         />

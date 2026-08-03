@@ -1,16 +1,33 @@
 'use server'
 
-import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
 import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { LivestockType } from '@prisma/client'
 import {
-  hatchlogPushMutation,
-  isHatchlogApiConfigured,
+  createLivestock,
+  createMortality,
+  deleteLivestock,
+  listLivestock,
+  restoreLivestock,
+  updateLivestock,
+  transferIsolation,
+  returnIsolation,
+  isolationMortality,
 } from '@/lib/hatchlog-api'
+
+export async function getAllBatchesViaNest() {
+  const { activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+  try {
+    const batches = await listLivestock(activeFarmId)
+    return Array.isArray(batches) ? batches : []
+  } catch (error) {
+    console.error('Error listing livestock via Nest:', error)
+    return []
+  }
+}
 
 export async function createBatch(data: {
   houseId: string
@@ -18,7 +35,7 @@ export async function createBatch(data: {
   initialCount: number
   arrivalDate: string
   batchName?: string
-  type?: LivestockType
+  type?: string
 }) {
   const { userId, activeFarmId } = await getAuthContext()
   if (!activeFarmId) return { success: false, error: 'No active farm selected' }
@@ -29,28 +46,23 @@ export async function createBatch(data: {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'createBatchLegacy', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const batch = await tx.livestock.create({
-      data: {
-        houseId: data.houseId,
-        farmId: activeFarmId,
-        breedType: data.breedType,
-        type: data.type || LivestockType.POULTRY_BROILER,
-        batchName: data.batchName || `Unit ${new Date().getTime()}`,
-        initialCount: data.initialCount,
-        currentCount: data.initialCount,
-        arrivalDate: new Date(data.arrivalDate),
-        status: 'active',
-        userId: userId
-      }
+  try {
+    const batch = await createLivestock({
+      farm_id: activeFarmId,
+      houseId: data.houseId,
+      breedType: data.breedType,
+      initialCount: data.initialCount,
+      arrivalDate: data.arrivalDate,
+      batchName: data.batchName,
+      type: data.type || 'POULTRY_BROILER',
     })
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
-    return { success: true, id: batch.id, batch }
-  }).catch((error: any) => {
+    return { success: true as const, id: (batch as any).id as string, batch }
+  } catch (error: any) {
     console.error('Error creating batch:', error)
-    return { success: false, error: 'Failed to create batch' }
-  })
+    return { success: false as const, error: error?.message || 'Failed to create batch' }
+  }
 }
 
 export async function updateBatch(id: string, data: {
@@ -62,7 +74,7 @@ export async function updateBatch(id: string, data: {
   status?: string
   batchName?: string
   growthTargetOverride?: string
-  type?: LivestockType
+  type?: string
 }) {
   const { userId, activeFarmId } = await getAuthContext()
   if (!activeFarmId) return { success: false, error: 'No active farm selected' }
@@ -73,38 +85,15 @@ export async function updateBatch(id: string, data: {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'updateBatch', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    // 1. Fetch existing to handle count synchronization
-    const existing = await tx.livestock.findUnique({
-      where: { id, farmId: activeFarmId },
-      select: { initialCount: true, currentCount: true }
-    })
-
-    if (!existing) throw new Error('Batch not found')
-
-    const updateData: any = {
-      ...data,
-      arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : undefined,
-    }
-
-    // 2. If initialCount is being changed, synchronize currentCount
-    if (data.initialCount !== undefined && data.initialCount !== existing.initialCount) {
-      const diff = data.initialCount - existing.initialCount
-      updateData.currentCount = (existing.currentCount || 0) + diff
-    }
-
-    const batch = await tx.livestock.update({
-      where: { id, farmId: activeFarmId },
-      data: updateData
-    })
-    
+  try {
+    const batch = await updateLivestock(id, data)
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
     return { success: true, batch }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error updating batch:', error)
-    return { success: false, error: error.message || 'Failed to update batch' }
-  })
+    return { success: false, error: error?.message || 'Failed to update batch' }
+  }
 }
 
 export async function deleteBatch(id: string, reason: string) {
@@ -119,31 +108,15 @@ export async function deleteBatch(id: string, reason: string) {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'deleteBatch', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const existing = await tx.livestock.findUnique({ where: { id, farmId: activeFarmId } })
-    if (existing) {
-      await tx.deleteLog.create({
-        data: {
-          userId,
-          farmId: activeFarmId,
-          tableName: 'livestock',
-          deletedDataCsv: JSON.stringify(existing),
-          reason: reason.trim()
-        }
-      })
-    }
-
-    await tx.livestock.update({
-      where: { id, farmId: activeFarmId },
-      data: { isDeleted: true, deletedAt: new Date() }
-    })
+  try {
+    await deleteLivestock(id, reason.trim())
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
     return { success: true }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error deleting batch:', error)
-    return { success: false, error: 'Failed to delete batch' }
-  })
+    return { success: false, error: error?.message || 'Failed to delete batch' }
+  }
 }
 
 export async function restoreBatch(id: string) {
@@ -156,19 +129,16 @@ export async function restoreBatch(id: string) {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'restoreBatch', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    await tx.livestock.update({
-      where: { id, farmId: activeFarmId },
-      data: { isDeleted: false, deletedAt: null }
-    })
+  try {
+    await restoreLivestock(id, activeFarmId)
     revalidatePath('/dashboard/flocks')
     revalidatePath('/dashboard/settings/trash')
     revalidateFarmPerformanceCaches(activeFarmId)
     return { success: true }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error restoring batch:', error)
-    return { success: false, error: 'Failed to restore batch' }
-  })
+    return { success: false, error: error?.message || 'Failed to restore batch' }
+  }
 }
 
 export async function logHealthEvent(data: {
@@ -190,79 +160,29 @@ export async function logHealthEvent(data: {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'logHealthEvent', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    // 1. Create Mortality record (serves as health/mortality log)
-    const record = await tx.healthMortality.create({
-      data: {
-        batchId: data.batchId,
-        farmId: activeFarmId,
-        count: data.count,
-        type: data.type,
-        isolationRoomId: data.type === 'SICK' ? data.isolationRoomId : null,
-        reason: data.reason,
-        category: data.category,
-        subCategory: data.subCategory,
-        logDate: new Date(data.logDate || new Date()),
-        userId: userId
-      }
+  try {
+    const record = await createMortality({
+      farm_id: activeFarmId,
+      batchId: data.batchId,
+      type: data.type,
+      count: data.count,
+      isolationRoomId: data.isolationRoomId,
+      reason: data.reason,
+      logDate: data.logDate,
+      category: data.category,
+      subCategory: data.subCategory,
     })
-
-    // 2. Update Livestock counts
-    const updateData: any = {}
-    
-    if (data.type === 'DEAD') {
-      updateData.currentCount = { decrement: data.count }
-    } else if (data.type === 'SICK') {
-      updateData.currentCount = { decrement: data.count }
-      updateData.isolationCount = { increment: data.count }
-    }
-
-    await tx.livestock.update({
-      where: { id: data.batchId, farmId: activeFarmId },
-      data: updateData
-    })
-
-    return { record }
-  }).then(async (result: any) => {
-    if (!result?.record) return result
-    if (isHatchlogApiConfigured()) {
-      try {
-        await hatchlogPushMutation({
-          userId,
-          farmId: activeFarmId,
-          clientId: result.record.id,
-          entityType: 'mortality',
-          payload: {
-            batch_id: data.batchId,
-            farm_id: activeFarmId,
-            count: data.count,
-            health_type: data.type,
-            reason: data.reason,
-            category: data.category,
-            sub_category: data.subCategory,
-            isolation_room_id: data.type === 'SICK' ? data.isolationRoomId : null,
-            log_date: data.logDate || new Date().toISOString(),
-          },
-        })
-      } catch (error) {
-        console.error('HatchLog API mortality sync push failed:', error)
-      }
-    }
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
-    return { success: true, record: result.record }
-  }).catch((error: any) => {
+    return { success: true, record }
+  } catch (error: any) {
     console.error('Error logging health event:', error)
-    return { success: false, error: error.message || 'Failed to log health event' }
-  })
+    return { success: false, error: error?.message || 'Failed to log health event' }
+  }
 }
 
-// Backward compatibility wrapper
 export async function logMortality(data: any) {
-  return logHealthEvent({
-    ...data,
-    type: 'DEAD'
-  })
+  return logHealthEvent({ ...data, type: 'DEAD' })
 }
 
 export async function transferToIsolation(id: string, count: number) {
@@ -275,32 +195,19 @@ export async function transferToIsolation(id: string, count: number) {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'transferToIsolation', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const batch = await tx.livestock.findUnique({
-      where: { id, farmId: activeFarmId }
+  try {
+    await transferIsolation({
+      farm_id: activeFarmId,
+      batchId: id,
+      count,
     })
-
-    if (!batch) return { success: false, error: 'Batch not found' }
-    if ((batch.currentCount || 0) < count + (batch.isolationCount || 0)) {
-       return { success: false, error: 'Not enough birds in main house to isolate' }
-    }
-
-    await tx.livestock.update({
-      where: { id, farmId: activeFarmId },
-      data: {
-        isolationCount: {
-          increment: count
-        }
-      }
-    })
-
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
     return { success: true }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error transferring to isolation:', error)
     return { success: false, error: error.message || 'Failed to transfer to isolation' }
-  })
+  }
 }
 
 export async function returnFromIsolation(id: string, count: number) {
@@ -313,31 +220,19 @@ export async function returnFromIsolation(id: string, count: number) {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'returnFromIsolation', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const batch = await tx.livestock.findUnique({
-      where: { id, farmId: activeFarmId }
+  try {
+    await returnIsolation({
+      farm_id: activeFarmId,
+      batchId: id,
+      count,
     })
-
-    if (!batch) return { success: false, error: 'Batch not found' }
-    if ((batch.isolationCount || 0) < count) {
-      return { success: false, error: 'Not enough birds in isolation to return' }
-    }
-
-    await tx.livestock.update({
-      where: { id, farmId: activeFarmId },
-      data: {
-        isolationCount: { decrement: count },
-        currentCount: { increment: count }
-      }
-    })
-
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
     return { success: true }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error returning from isolation:', error)
     return { success: false, error: error.message || 'Failed to return from isolation' }
-  })
+  }
 }
 
 export async function logMortalityInIsolation(data: {
@@ -356,42 +251,20 @@ export async function logMortalityInIsolation(data: {
   const limitResult = await checkRateLimit({ policy: 'production.write', scope: 'logMortalityInIsolation', farmId: activeFarmId, userId })
   if (!limitResult.ok) return rateLimitActionError(limitResult)
 
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const batch = await tx.livestock.findUnique({
-      where: { id: data.batchId, farmId: activeFarmId }
+  try {
+    const record = await isolationMortality({
+      farm_id: activeFarmId,
+      batchId: data.batchId,
+      count: data.count,
+      reason: data.reason,
+      category: data.category,
+      subCategory: data.subCategory,
     })
-
-    if (!batch) throw new Error('Batch not found')
-    if ((batch.isolationCount || 0) < data.count) {
-      throw new Error('Not enough birds in isolation')
-    }
-
-    await tx.healthMortality.create({
-      data: {
-        batchId: data.batchId,
-        farmId: activeFarmId,
-        count: data.count,
-        type: 'DEAD',
-        reason: data.reason || 'Mortality while in isolation',
-        category: data.category || 'Health',
-        subCategory: data.subCategory || 'Isolation Mortality',
-        logDate: new Date(),
-        userId: userId
-      }
-    })
-
-    await tx.livestock.update({
-      where: { id: data.batchId, farmId: activeFarmId },
-      data: {
-        isolationCount: { decrement: data.count }
-      }
-    })
-
     revalidatePath('/dashboard/flocks')
     revalidateFarmPerformanceCaches(activeFarmId)
-    return { success: true }
-  }).catch((error: any) => {
-    console.error('Error logging mortality in isolation:', error)
+    return { success: true, record }
+  } catch (error: any) {
+    console.error('Error logging isolation mortality:', error)
     return { success: false, error: error.message || 'Failed to log mortality' }
-  })
+  }
 }

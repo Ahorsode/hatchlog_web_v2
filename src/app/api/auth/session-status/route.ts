@@ -1,43 +1,34 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import prisma from '@/lib/db';
-import { SECURITY_PERMISSION_UPDATE_MESSAGE } from '@/lib/auth-utils';
+import { NextResponse } from 'next/server'
+import { getAppSessionUser } from '@/lib/supabase/session'
+import { SECURITY_PERMISSION_UPDATE_MESSAGE } from '@/lib/auth-utils'
+import { hatchlogProfileByIdentity } from '@/lib/hatchlog-api'
 
 export async function GET() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ ok: false, revoked: false }, { status: 401 });
+  const sessionUser = await getAppSessionUser()
+  if (!sessionUser?.id) {
+    return NextResponse.json({ authenticated: false }, { status: 401 })
   }
 
-  const sessionUser = session.user as any;
+  try {
+    const user = await hatchlogProfileByIdentity(
+      sessionUser.email || undefined,
+      sessionUser.phoneNumber || undefined,
+    )
 
-  if (sessionUser.securityInvalidated) {
-    return NextResponse.json({
-      ok: false,
-      revoked: true,
-      message: sessionUser.securityNotice || SECURITY_PERMISSION_UPDATE_MESSAGE
-    });
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      sessionVersion: true,
-      securityNotice: true
+    if (!user) {
+      return NextResponse.json({ authenticated: false }, { status: 401 })
     }
-  });
 
-  if (!user) {
-    return NextResponse.json({ ok: false, revoked: false }, { status: 401 });
+    const revoked =
+      sessionUser.securityInvalidated ||
+      (user.sessionVersion != null && sessionUser.sessionVersion < user.sessionVersion)
+
+    return NextResponse.json({
+      authenticated: true,
+      revoked,
+      message: revoked ? SECURITY_PERMISSION_UPDATE_MESSAGE : null,
+    })
+  } catch {
+    return NextResponse.json({ authenticated: true, revoked: false, message: null })
   }
-
-  const sessionVersion = sessionUser.sessionVersion;
-  const revoked = typeof sessionVersion === 'number' && sessionVersion < user.sessionVersion;
-
-  return NextResponse.json({
-    ok: !revoked,
-    revoked,
-    message: revoked ? (user.securityNotice || SECURITY_PERMISSION_UPDATE_MESSAGE) : null
-  });
 }

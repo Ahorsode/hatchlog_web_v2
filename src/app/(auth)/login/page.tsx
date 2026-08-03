@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Phone, ArrowRight, Loader2, Plus, Lock, ShieldAlert } from 'lucide-react';
 import Background3D from '@/components/auth/Background3D';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const SECURITY_NOTICE = 'Your security permissions have been updated. Please sign in again to activate your new features.';
 
@@ -21,10 +21,10 @@ export default function LoginPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const authError = searchParams.get('error');
-    if (authError === 'OAuthAccountNotLinked') {
-      setError('This Google account could not be linked. Sign in with the email your administrator invited you with.');
-    } else if (authError) {
+    if (authError === 'oauth' || authError === 'OAuthAccountNotLinked') {
       setError('Google sign-in failed. Please try again or contact your farm administrator.');
+    } else if (authError) {
+      setError('Sign-in failed. Please try again.');
     }
 
     if (searchParams.get('security') !== 'updated') return;
@@ -43,32 +43,53 @@ export default function LoginPage() {
     setError('');
     
     try {
-      const res = await signIn('credentials', {
-        identifier: phoneNumber,
-        password: password,
-        redirect: false,
+      const res = await fetch('/api/auth/supabase-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: phoneNumber,
+          password,
+        }),
       });
-      
-        if (res?.error) {
-          setError('Invalid phone number or password.');
-          setIsLoading(false);
-        } else {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/dashboard');
-          router.refresh();
-        }, 800);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.message || 'Invalid phone number or password.');
+        setIsLoading(false);
+        return;
       }
-    } catch (err) {
+
+      setSuccess(true);
+      setTimeout(() => {
+        router.push(data.mustChangePassword ? '/change-password' : '/dashboard');
+        router.refresh();
+      }, 800);
+    } catch {
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     if (isLoading) return;
     setIsLoading(true);
-    signIn('google', { callbackUrl: '/dashboard' });
+    setError('');
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const redirectTo = `${window.location.origin}/api/auth/callback?next=/dashboard`;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (oauthError) {
+        setError(oauthError.message || 'Google sign-in failed.');
+        setIsLoading(false);
+      }
+    } catch {
+      setError('Google sign-in failed. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   return (

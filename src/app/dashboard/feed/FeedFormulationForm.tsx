@@ -14,7 +14,7 @@ import {
   X
 } from 'lucide-react'
 import { createFeedFormulation } from '@/lib/actions/feed-actions'
-import { FeedType, LivestockType } from '@prisma/client'
+import { FeedType, LivestockType } from '@/lib/enums'
 import { toast } from 'sonner'
 
 const FEED_TYPES = [

@@ -1,7 +1,7 @@
 'use server'
 
 import { getAdminSession } from '@/lib/admin-session'
-import prisma from '@/lib/db'
+import { adminGetFarmApi } from '@/lib/hatchlog-api'
 
 export type AdminFarmDevice = {
   id: string
@@ -25,53 +25,24 @@ export async function getDevicesForFarm(farmId: string) {
   const adminSession = await getAdminSession()
   if (!adminSession || !farmId) return { success: false, devices: [] as AdminFarmDevice[] }
 
-  const devices = await prisma.deviceRegistration.findMany({
-    where: { farmId },
-    select: {
-      id: true,
-      hardwareId: true,
-      deviceName: true,
-      deviceType: true,
-      status: true,
-      licenseExpiresAt: true,
-      lastSync: true,
-    },
-    orderBy: { licenseExpiresAt: 'desc' },
-  })
+  try {
+    const farm = await adminGetFarmApi(farmId) as {
+      devices?: AdminFarmDevice[]
+    }
 
-  return {
-    success: true,
-    devices: devices.map((device) => ({
-      ...device,
-      licenseExpiresAt: device.licenseExpiresAt?.toISOString() ?? null,
-      lastSync: device.lastSync?.toISOString() ?? null,
-    })),
+    return {
+      success: true,
+      devices: farm.devices ?? [],
+    }
+  } catch (error) {
+    console.error('[getDevicesForFarm]', error)
+    return { success: false, devices: [] as AdminFarmDevice[] }
   }
 }
 
-export async function getDeviceByHardwareId(hardwareId: string): Promise<AdminDeviceLookup | null> {
+export async function getDeviceByHardwareId(_hardwareId: string): Promise<AdminDeviceLookup | null> {
   const adminSession = await getAdminSession()
-  if (!adminSession || !hardwareId.trim()) return null
+  if (!adminSession || !_hardwareId.trim()) return null
 
-  const device = await prisma.deviceRegistration.findFirst({
-    where: { hardwareId: hardwareId.trim() },
-    select: {
-      id: true,
-      farmId: true,
-      status: true,
-      licenseExpiresAt: true,
-      lastSync: true,
-      farm: { select: { name: true, subscriptionTier: true } },
-    },
-  })
-
-  if (!device) return null
-
-  return {
-    farmName: device.farm?.name ?? 'Unknown Farm',
-    subscriptionTier: device.farm?.subscriptionTier ?? 'BASIC',
-    status: device.status,
-    licenseExpiresAt: device.licenseExpiresAt?.toISOString() ?? null,
-    lastSync: device.lastSync?.toISOString() ?? null,
-  }
+  throw new Error('Not available: use Nest admin API extension for device lookup by hardware ID')
 }

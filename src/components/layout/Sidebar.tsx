@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, Bird, PawPrint, Egg, ThermometerSun, 
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { canShowNavigationItem, formatRoleLabel } from '@/lib/navigation-permissions';
+import { signOutClient } from '@/lib/supabase/sign-out-client';
 
 export const Sidebar = ({ role, permissions }: { role?: string, permissions?: any }) => {
   const pathname = usePathname();
@@ -148,7 +148,7 @@ export const Sidebar = ({ role, permissions }: { role?: string, permissions?: an
 
             {/* Logout Action */}
             <div 
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => void signOutClient('/login')}
               className="flex items-center hover:bg-red-500/10 rounded-md p-2 transition-all cursor-pointer group/logout"
             >
               <div className="w-10 h-10 rounded-md bg-white/10 flex items-center justify-center text-white/70 shrink-0 group-hover/logout:bg-red-500/20 group-hover/logout:text-red-400 transition-colors">

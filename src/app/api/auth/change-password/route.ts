@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/db';
-import bcrypt from 'bcryptjs';
-import { auth } from '@/auth';
+import { getAppSessionUser } from '@/lib/supabase/session';
 import { passwordPolicyError } from '@/lib/password-policy';
+import { updatePasswordApi } from '@/lib/hatchlog-api';
 
 export async function POST(req: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const sessionUser = await getAppSessionUser();
+    if (!sessionUser?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
@@ -18,20 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: passwordError }, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    const updateData: any = {
-      password: hashedPassword,
-      mustChangePassword: false,
-    };
-
-    if (firstname) updateData.firstname = firstname;
-    if (surname) updateData.surname = surname;
-
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: updateData,
-    });
+    await updatePasswordApi({ current: '', new: newPassword });
 
     return NextResponse.json({ message: 'Password updated successfully' }, { status: 200 });
   } catch (error: any) {

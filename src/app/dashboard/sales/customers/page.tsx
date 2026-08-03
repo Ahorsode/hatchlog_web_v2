@@ -35,7 +35,7 @@ export default async function CustomersPage() {
     return await getAuthContext();
   })();
 
-  const hasCRM = await checkFeature(activeFarmId, 'CRM');
+  const hasCRM = activeFarmId ? await checkFeature(activeFarmId, 'CRM') : false;
 
   if (!hasCRM) {
     return (

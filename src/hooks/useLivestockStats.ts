@@ -1,4 +1,4 @@
-import { LivestockType } from '@prisma/client';
+import { LivestockType } from '@/lib/enums';
 
 export function useLivestockStats() {
   const getAgeInDays = (hatchDate: string) => {

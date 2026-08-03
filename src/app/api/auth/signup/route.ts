@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
 import { normalizePhoneNumber } from '@/lib/auth-utils';
 import { checkRateLimit, getRateLimitIp, rateLimitHeaders } from '@/lib/performance/rate-limit';
 import { MAX_PASSWORD_LENGTH, passwordPolicyError } from '@/lib/password-policy';
 import { z } from 'zod';
+import { hatchlogBootstrapProfile, hatchlogProfileByIdentity } from '@/lib/hatchlog-api';
 
 const signupSchema = z.object({
   firstname: z.string().trim().min(1, 'First name is required').max(100),
@@ -51,41 +50,14 @@ export async function POST(req: Request) {
 
     const { firstname, surname, email, phoneNumber, password } = parsed.data;
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const cleanEmail = email ?? undefined;
 
-    // Ensure email is null if empty string to avoid unique constraint issues
-    const cleanEmail = email ?? null;
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { phoneNumber: normalizedPhone || phoneNumber },
-          ...(cleanEmail ? [{ email: cleanEmail }] : [])
-        ]
-      }
-    });
-
-    // If user exists and already has a password, it's a real duplicate.
-    // If user exists and doesn't have a password (or is invited), we can update them.
-    if (existingUser && existingUser.password && !existingUser.mustChangePassword) {
-      return NextResponse.json({ message: 'User already exists and is fully registered' }, { status: 400 });
+    const existing = await hatchlogProfileByIdentity(cleanEmail, normalizedPhone || phoneNumber);
+    if (existing && existing.id) {
+      return NextResponse.json({ message: 'User already exists' }, { status: 400 });
     }
 
-    // Check for invitations
-    const invitation = await prisma.invitation.findFirst({
-      where: {
-        OR: [
-          { phoneNumber: normalizedPhone || phoneNumber },
-          ...(cleanEmail ? [{ email: cleanEmail }] : [])
-        ],
-        status: 'PENDING'
-      }
-    });
-
-    // Handle password
-    // If invited, we use a secure random token as default if no password provided
-    const rawPassword = password || (invitation ? randomBytes(16).toString('hex') : null);
-    
+    const rawPassword = password;
     if (!rawPassword) {
       return NextResponse.json({ message: 'Password is required' }, { status: 400 });
     }
@@ -96,86 +68,25 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
-    
-    // Invited users must set a password they know after the random temporary credential.
-    const mustChangePassword = !!invitation;
 
-    // Create or Update the user and associated resources in a transaction
-    const user = await prisma.$transaction(async (tx) => {
-      let txUser;
-      if (existingUser) {
-        txUser = await tx.user.update({
-          where: { id: existingUser.id },
-          data: {
-            firstname: firstname || '',
-            surname: surname || '',
-            email: cleanEmail || existingUser.email,
-            password: hashedPassword,
-            mustChangePassword,
-            role: invitation?.role || existingUser.role || 'OWNER',
-          }
-        });
-      } else {
-        txUser = await tx.user.create({
-          data: {
-            firstname: firstname || '',
-            surname: surname || '',
-            email: cleanEmail,
-            phoneNumber: normalizedPhone || phoneNumber,
-            password: hashedPassword,
-            mustChangePassword,
-            role: invitation?.role || 'OWNER',
-          }
-        });
-      }
-
-      // If there's an invitation, link to farm and update invitation
-      if (invitation) {
-        await tx.farmMember.create({
-          data: {
-            farmId: invitation.farmId,
-            userId: txUser.id,
-            role: invitation.role
-          }
-        });
-
-        await tx.invitation.update({
-          where: { id: invitation.id },
-          data: { status: 'ACCEPTED' }
-        });
-      } else if (!existingUser || !existingUser.password) {
-        // Create default farm for new standalone owners
-        const newFarm = await tx.farm.create({
-          data: {
-            name: `${firstname || 'My'}'s Farm`,
-            userId: txUser.id,
-            capacity: 0,
-            location: '',
-          }
-        });
-
-        await tx.farmMember.create({
-          data: {
-            farmId: newFarm.id,
-            userId: txUser.id,
-            role: 'OWNER'
-          }
-        });
-      }
-
-      return txUser;
+    const result = await hatchlogBootstrapProfile({
+      email: cleanEmail,
+      phoneNumber: normalizedPhone || phoneNumber,
+      firstname: firstname || '',
+      surname: surname || '',
+      passwordHash: hashedPassword,
     });
 
-    return NextResponse.json({ 
-      message: 'User created successfully', 
+    return NextResponse.json({
+      message: 'User created successfully',
       user: {
-        id: user.id,
-        firstname: user.firstname,
-        surname: user.surname,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        mustChangePassword: user.mustChangePassword
-      } 
+        id: result.userId,
+        firstname,
+        surname,
+        email: cleanEmail || null,
+        phoneNumber: normalizedPhone || phoneNumber,
+        mustChangePassword: false,
+      },
     }, { status: 201 });
   } catch (error: any) {
     console.error('Error during signup:', error);

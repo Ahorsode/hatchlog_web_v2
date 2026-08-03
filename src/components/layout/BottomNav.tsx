@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, PawPrint, XCircle, User, Egg, ThermometerSun, Banknote, Wheat, Wallet, Users, Settings, Crown, LogOut, ShieldCheck, BarChart3, Activity, FileText, HeartPulse } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { signOut } from 'next-auth/react';
 import { canShowNavigationItem } from '@/lib/navigation-permissions';
+import { signOutClient } from '@/lib/supabase/sign-out-client';
 
 export const BottomNav = ({ role, permissions }: { role?: string, permissions?: any }) => {
   const pathname = usePathname();
@@ -77,7 +77,7 @@ export const BottomNav = ({ role, permissions }: { role?: string, permissions?: 
         
         {/* Logout Button */}
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => void signOutClient('/login')}
           className="relative flex flex-col items-center justify-center min-w-[4.5rem] shrink-0 snap-center h-14 rounded-md transition-all duration-300 text-red-400/60 hover:text-red-400"
         >
           <LogOut className="w-6 h-6 z-10" />

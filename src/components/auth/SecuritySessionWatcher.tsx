@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { signOut, useSession } from 'next-auth/react';
 import { toast } from 'sonner';
+import { signOutClient } from '@/lib/supabase/sign-out-client';
 
 const NOTICE_KEY = 'hatchlog_security_notice';
 const DEFAULT_NOTICE = 'Your security permissions have been updated. Please sign in again to activate your new features.';
@@ -26,7 +26,6 @@ function clearAuthCaches(message: string) {
 }
 
 export function SecuritySessionWatcher() {
-  const { status, data: session } = useSession();
   const isSigningOut = useRef(false);
 
   const forceSignOut = useCallback(async (message: string) => {
@@ -36,18 +35,11 @@ export function SecuritySessionWatcher() {
     clearAuthCaches(message);
     toast.warning(message);
 
-    await signOut({
-      callbackUrl: '/login?security=updated'
-    });
+    await signOutClient('/login?security=updated');
   }, []);
 
   const checkSession = useCallback(async () => {
-    if (status !== 'authenticated' || isSigningOut.current) return;
-
-    if ((session?.user as any)?.securityInvalidated) {
-      await forceSignOut((session?.user as any)?.securityNotice || DEFAULT_NOTICE);
-      return;
-    }
+    if (isSigningOut.current) return;
 
     try {
       const response = await fetch('/api/auth/session-status', {
@@ -65,11 +57,9 @@ export function SecuritySessionWatcher() {
     } catch {
       // A transient network miss should not kick an active operator out.
     }
-  }, [forceSignOut, session?.user, status]);
+  }, [forceSignOut]);
 
   useEffect(() => {
-    if (status !== 'authenticated') return;
-
     void checkSession();
     const interval = window.setInterval(() => void checkSession(), 15_000);
 
@@ -86,7 +76,7 @@ export function SecuritySessionWatcher() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [checkSession, status]);
+  }, [checkSession]);
 
   return null;
 }

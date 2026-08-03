@@ -17,7 +17,7 @@ export function MarketingSuite() {
     try {
       const res = await generateSocialPost()
       if (res.success) {
-        setPost(res.postText)
+        setPost(res.postText ?? null)
       }
     } catch (err) {
       console.error(err)

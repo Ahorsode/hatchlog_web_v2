@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { signIn } from "next-auth/react";
+import { createBrowserClient } from '@supabase/ssr';
 import GlassCard from "./GlassCard";
 import FloatingInput from "./FloatingInput";
 import GoogleButton from "./GoogleButton";
@@ -51,9 +51,16 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    signIn("google", { callbackUrl: "/dashboard" });
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+    });
   };
 
   return (

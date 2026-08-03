@@ -1,71 +1,91 @@
 'use server'
 
-import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
-import { checkWorkerPermissions } from './staff-actions'
+import {
+  createHouseApi,
+  deleteHouseApi,
+  listHouses,
+  updateHouseApi,
+} from '@/lib/hatchlog-api'
+
+export async function getHousesViaNest() {
+  const { activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return []
+  try {
+    const houses = await listHouses(activeFarmId)
+    return Array.isArray(houses) ? houses : []
+  } catch (error) {
+    console.error('Error listing houses via Nest:', error)
+    return []
+  }
+}
 
 export async function updateHouse(id: string, data: {
   name?: string
   capacity?: number
 }) {
-  const { userId, activeFarmId } = await getAuthContext()
+  const { activeFarmId } = await getAuthContext()
   if (!activeFarmId) return { success: false, error: 'No active farm selected' }
 
-  // House management should be Owner or Manager
-  const membership = await prisma.farmMember.findUnique({
-    where: { farmId_userId: { farmId: activeFarmId, userId } }
-  })
-  const farm = await prisma.farm.findUnique({ where: { id: activeFarmId } })
-  
-  if (farm?.userId !== userId && membership?.role !== 'MANAGER') {
-    return { success: false, error: 'Unauthorized' }
-  }
-
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    const house = await tx.house.update({
-      where: { id, farmId: activeFarmId },
-      data
-    })
+  try {
+    const house = await updateHouseApi(id, data)
     revalidatePath('/dashboard/settings')
     revalidatePath('/dashboard/houses')
-    return { 
-      success: true, 
-      house: { 
-        ...house, 
-        currentTemperature: house.currentTemperature ? Number(house.currentTemperature) : null,
-        currentHumidity: house.currentHumidity ? Number(house.currentHumidity) : null
-      } 
+    return {
+      success: true,
+      house: {
+        ...(house as any),
+        currentTemperature: (house as any).currentTemperature
+          ? Number((house as any).currentTemperature)
+          : null,
+        currentHumidity: (house as any).currentHumidity
+          ? Number((house as any).currentHumidity)
+          : null,
+      },
     }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error updating house:', error)
-    return { success: false, error: 'Failed to update house' }
-  })
+    return { success: false, error: error?.message || 'Failed to update house' }
+  }
 }
 
 export async function deleteHouse(id: string) {
-  const { userId, activeFarmId } = await getAuthContext()
+  const { activeFarmId } = await getAuthContext()
   if (!activeFarmId) return { success: false, error: 'No active farm selected' }
 
-  // House management should be Owner or Manager
-  const membership = await prisma.farmMember.findUnique({
-    where: { farmId_userId: { farmId: activeFarmId, userId } }
-  })
-  const farm = await prisma.farm.findUnique({ where: { id: activeFarmId } })
-  
-  if (farm?.userId !== userId && membership?.role !== 'MANAGER') {
-    return { success: false, error: 'Unauthorized' }
-  }
-
-  return await (prisma as any).$withFarmContext(userId, activeFarmId, async (tx: any) => {
-    await tx.house.delete({
-      where: { id, farmId: activeFarmId }
-    })
+  try {
+    await deleteHouseApi(id)
     revalidatePath('/dashboard/settings')
     revalidatePath('/dashboard/houses')
     return { success: true }
-  }).catch((error: any) => {
+  } catch (error: any) {
     console.error('Error deleting house:', error)
-    return { success: false, error: 'Failed to delete house' }
-  })
+    return { success: false, error: error?.message || 'Failed to delete house' }
+  }
+}
+
+export async function createHouseAction(data: {
+  name: string
+  capacity: number
+  isIsolation?: boolean
+}) {
+  const { activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return { success: false, error: 'No active farm selected' }
+
+  try {
+    const house = await createHouseApi({
+      farm_id: activeFarmId,
+      name: data.name,
+      capacity: data.capacity,
+      isIsolation: data.isIsolation,
+    })
+    revalidatePath('/dashboard/settings')
+    revalidatePath('/dashboard/houses')
+    revalidatePath('/dashboard')
+    return { success: true, house }
+  } catch (error: any) {
+    console.error('Error creating house:', error)
+    return { success: false, error: error?.message || 'Failed to create house' }
+  }
 }

@@ -1,30 +1,21 @@
 import React from 'react';
 import { getAuthContext } from '@/lib/auth-utils';
-import prisma from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { User, Mail, Shield, Building, Calendar } from 'lucide-react';
 import { EditProfileButton } from '@/components/profile/EditProfileButton';
 import { formatRoleLabel } from '@/lib/navigation-permissions';
+import { hatchlogMe, getFarm } from '@/lib/hatchlog-api';
 
 export default async function ProfilePage() {
   const { userId, activeFarmId, role } = await getAuthContext();
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      memberships: {
-        where: { farmId: activeFarmId },
-        include: { farm: true }
-      }
-    }
-  });
+  const me = await hatchlogMe();
+  const farm = activeFarmId ? await getFarm(activeFarmId).catch(() => null) as any : null;
 
-  const membership = user?.memberships[0];
-  const farm = membership?.farm;
+  const displayName = [me.firstname, me.surname].filter(Boolean).join(' ') || 'Farm User';
 
   return (
     <div className="max-w-4xl mx-auto space-y-7 px-0 md:px-3 pt-2 pb-11 md:py-11">
-      {/* Hero card */}
       <div className="relative group">
          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 to-amber-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
          <div className="relative bg-black/60 backdrop-blur-3xl border border-white/10 p-7 rounded-lg flex flex-col md:flex-row items-center gap-7 shadow-2xl">
@@ -36,32 +27,28 @@ export default async function ProfilePage() {
             
             <div className="flex-1 text-center md:text-left space-y-2">
                <div className="flex flex-col md:flex-row md:items-center gap-2 justify-center md:justify-start">
-                  <h1 className="text-4xl font-bold text-white tracking-normal">{user?.name || 'Farm User'}</h1>
+                  <h1 className="text-4xl font-bold text-white tracking-normal">{displayName}</h1>
                   <span className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest rounded-full h-fit flex items-center gap-1.5 self-center">
                      <Shield className="w-3 h-3" /> {formatRoleLabel(role)}
                   </span>
                </div>
                <p className="text-white/80 font-medium flex items-center justify-center md:justify-start gap-2">
-                  <Mail className="w-4 h-4" /> {user?.email}
-               </p>
-               <p className="text-amber-500/80 font-bold text-xs uppercase tracking-[0.2em] pt-2">
-                  Member since {user?.createdAt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                  <Mail className="w-4 h-4" /> {me.email}
                </p>
             </div>
 
             <div className="flex flex-col gap-2 w-full md:w-auto">
                <EditProfileButton 
                  initialData={{
-                   firstname: user?.firstname || '',
-                   middleName: user?.middleName || '',
-                   surname: user?.surname || ''
+                   firstname: me.firstname || '',
+                   middleName: '',
+                   surname: me.surname || ''
                  }} 
                />
             </div>
          </div>
       </div>
 
-      {/* Farm Organization Card (full-width, no license card) */}
       <Card className="bg-black/20 border-white/5 overflow-hidden">
          <CardHeader className="border-b border-white/5 bg-white/[0.02]">
             <CardTitle className="text-sm font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2">

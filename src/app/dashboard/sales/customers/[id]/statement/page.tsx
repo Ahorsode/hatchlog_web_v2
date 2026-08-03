@@ -20,7 +20,7 @@ export default async function CustomerStatementPage({ params }: { params: Promis
     redirect('/dashboard/sales/customers');
   }
 
-  const transactions = statement.orders.sort((a, b) => new Date(b.orderDate || b.createdAt).getTime() - new Date(a.orderDate || a.createdAt).getTime());
+  const transactions = statement.orders.sort((a: any, b: any) => new Date(b.orderDate || b.createdAt).getTime() - new Date(a.orderDate || a.createdAt).getTime());
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-7 px-0 md:px-5 pt-2 pb-9 md:py-9 relative">
@@ -88,7 +88,7 @@ export default async function CustomerStatementPage({ params }: { params: Promis
                   No orders recorded yet.
                </div>
             ) : (
-               transactions.map((order, index) => (
+               transactions.map((order: any, index: number) => (
                   <div key={order.id} className="group relative bg-white/5 border border-white/10 p-5 rounded-lg hover:bg-white/[0.08] transition-all">
                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-white/5">
                         <div className="flex items-center gap-5">
@@ -120,7 +120,7 @@ export default async function CustomerStatementPage({ params }: { params: Promis
                      </div>
                      
                      <div className="space-y-2">
-                        {order.items.map((item, idx) => (
+                        {order.items.map((item: any, idx: number) => (
                           <div key={idx} className="flex justify-between items-center text-[11px] font-bold">
                              <span className="text-white/60 uppercase tracking-widest truncate max-w-[70%]">
                                {item.description} <span className="text-white/20 italic font-normal">x{item.quantity}</span>

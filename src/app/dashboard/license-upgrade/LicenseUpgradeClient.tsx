@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requestSubscriptionUpgrade } from "@/lib/actions/subscription-actions";
 import { type DesktopLicenseRow } from "@/lib/actions/licenses";
-import { type SubscriptionTier } from "@prisma/client";
+import { type SubscriptionTier } from '@/lib/enums';
 import { cn } from "@/lib/utils";
 
 type PaidTier = Extract<SubscriptionTier, "STANDARD" | "PREMIUM">;
