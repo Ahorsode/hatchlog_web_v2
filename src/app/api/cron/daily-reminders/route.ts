@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server'
 
 /**
- * Phase 2: Daily reminder cron should be moved to the Nest backend scheduler.
- * This stub returns 410 Gone to indicate it's no longer handled here.
+ * Daily reminders are owned by Nest (`RemindersScheduler` + BullMQ
+ * `daily-reminders` jobs). This route remains only as a documented 410.
  */
-export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  return NextResponse.json({
-    message: 'Daily reminders are now handled by the Nest backend scheduler.',
-    evaluatedAt: new Date().toISOString(),
-    farmsWithAlerts: 0,
-    results: [],
-  })
+export async function GET() {
+  return NextResponse.json(
+    {
+      error: 'Gone',
+      message:
+        'Daily reminders are handled by the Nest backend scheduler/worker. Remove this Vercel cron entry.',
+    },
+    { status: 410 },
+  )
 }

@@ -3,6 +3,10 @@ import { getAuthContext } from '@/lib/auth-utils'
 import { getBatchAnalytics, getMortalityTrends } from '@/lib/actions/analytics-actions'
 import { listLivestock, listInventory } from '@/lib/hatchlog-api'
 
+/**
+ * Thin BFF: aggregates Nest livestock/inventory/analytics reads for the dashboard UI.
+ * Reorder/low-stock filtering uses Nest-provided reorderLevel only (no local business rules).
+ */
 export async function GET(req: Request) {
   const { userId, activeFarmId } = await getAuthContext()
   if (!userId) {
@@ -14,35 +18,54 @@ export async function GET(req: Request) {
   const farmId = farmIdStr || activeFarmId
 
   if (!farmId) {
-    return NextResponse.json({ error: 'farmId is required or no active farm' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'farmId is required or no active farm' },
+      { status: 400 },
+    )
   }
 
   try {
-    const activeBatches = await listLivestock(farmId, { status: 'active' }) as any[]
+    const activeBatches = (await listLivestock(farmId, {
+      status: 'active',
+    })) as unknown[]
     const batchList = Array.isArray(activeBatches) ? activeBatches : []
 
     const batchStats = await Promise.all(
-      batchList.map(async (b: any) => {
+      batchList.map(async (b: unknown) => {
+        const batch = b as { id?: string }
+        if (!batch.id) return b
         try {
-          const stats = await getBatchAnalytics(b.id) as Record<string, unknown>
-          return { ...b, ...(stats && typeof stats === 'object' ? stats : {}) }
+          const stats = (await getBatchAnalytics(batch.id)) as Record<
+            string,
+            unknown
+          >
+          return {
+            ...batch,
+            ...(stats && typeof stats === 'object' ? stats : {}),
+          }
         } catch {
           return b
         }
-      })
+      }),
     )
 
     const mortalityTrends = await getMortalityTrends(farmId).catch(() => null)
 
-    let lowInventory: any[] = []
+    let lowInventory: unknown[] = []
     try {
-      const allInventory = await listInventory(farmId, { category: 'FEED' }) as any[]
+      const allInventory = (await listInventory(farmId, {
+        category: 'FEED',
+      })) as Array<{
+        stockLevel?: number
+        reorderLevel?: number
+      }>
       lowInventory = (Array.isArray(allInventory) ? allInventory : []).filter(
-        (item: any) => {
+        (item) => {
           const stock = Number(item.stockLevel || 0)
           const reorder = Number(item.reorderLevel || 0)
-          return reorder > 0 ? stock <= reorder : stock <= 5
-        }
+          // Only flag when Nest has set a reorder threshold.
+          return reorder > 0 && stock <= reorder
+        },
       )
     } catch {
       // not critical
@@ -52,7 +75,7 @@ export async function GET(req: Request) {
       batchStats,
       mortalityTrends,
       lowInventory,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   } catch (error) {
     console.error('API Error:', error)

@@ -1,7 +1,7 @@
 'use server'
 
 import { requirePaymentAdminAction } from '@/lib/admin-auth'
-import { adminListLicensesApi, adminPostApi } from '@/lib/hatchlog-api'
+import { adminPaymentDashboardApi, adminPostApi } from '@/lib/hatchlog-api'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -71,9 +71,7 @@ const confirmPaymentSchema = z.object({
 export async function getPaymentAdminDashboardData(): Promise<PaymentAdminDashboardData> {
   await requirePaymentAdminAction()
 
-  const data = await adminListLicensesApi() as unknown as PaymentAdminDashboardData
-
-  return data
+  return (await adminPaymentDashboardApi()) as PaymentAdminDashboardData
 }
 
 export async function confirmManualLicensePayment(input: unknown): Promise<ConfirmManualLicensePaymentResult> {

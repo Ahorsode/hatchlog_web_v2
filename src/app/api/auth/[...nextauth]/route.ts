@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 
-const GONE = NextResponse.json(
-  { error: 'NextAuth is no longer active. Use Supabase auth.' },
-  { status: 410 },
-)
-
-export function GET() {
-  return GONE
+/** NextAuth removed — use Supabase Auth routes instead. */
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Gone', message: 'NextAuth has been removed. Use Supabase Auth.' },
+    { status: 410 },
+  )
 }
-export function POST() {
-  return GONE
+
+export async function POST() {
+  return GET()
 }

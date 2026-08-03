@@ -9,6 +9,8 @@ import {
   updateSalesSettingsApi,
   updateInventoryApi,
   createHealthSchedulesApi,
+  getGrowthStandardsApi,
+  getMonthlyProductionSummaryApi,
 } from '@/lib/hatchlog-api'
 
 export async function updateFarmSettings(data: {
@@ -176,14 +178,37 @@ export async function updateSalesSettings(data: {
   }
 }
 
-// TODO: Growth standards are a global (non-farm-scoped) table.
-// Add a Nest API endpoint to serve them, then replace this stub.
-export async function getGrowthStandards(_type?: any) {
-  return []
+export async function getGrowthStandards(type?: string) {
+  try {
+    const rows = await getGrowthStandardsApi(type)
+    return Array.isArray(rows) ? rows : []
+  } catch (error: any) {
+    console.error('Error fetching growth standards:', error)
+    return []
+  }
 }
 
-// TODO: Monthly production summary can be pulled from Nest dashboard stats.
-// Replace this stub when the dashboard stats API includes the required fields.
-export async function getMonthlyProductionSummary() {
-  return null
+export async function getMonthlyProductionSummary(): Promise<{
+  revenue: number
+  expenses: number
+  eggs: number
+} | null> {
+  const { activeFarmId } = await getAuthContext()
+  if (!activeFarmId) return null
+
+  try {
+    const summary = (await getMonthlyProductionSummaryApi(activeFarmId)) as {
+      revenue?: number
+      expenses?: number
+      eggs?: number
+    }
+    return {
+      revenue: Number(summary?.revenue ?? 0),
+      expenses: Number(summary?.expenses ?? 0),
+      eggs: Number(summary?.eggs ?? 0),
+    }
+  } catch (error: any) {
+    console.error('Error fetching monthly production summary:', error)
+    return null
+  }
 }

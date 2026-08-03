@@ -1,8 +1,7 @@
 const required = [
-  "DATABASE_URL",
-  "DIRECT_URL",
-  "AUTH_SECRET",
-  "NEXTAUTH_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "HATCHLOG_API_URL",
 ];
 
 export function validateEnv() {

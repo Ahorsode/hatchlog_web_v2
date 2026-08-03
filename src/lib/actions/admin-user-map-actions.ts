@@ -1,7 +1,7 @@
 'use server'
 
 import { requirePaymentAdminAction } from '@/lib/admin-auth'
-import { adminPostApi } from '@/lib/hatchlog-api'
+import { adminListUsersApi, adminPostApi } from '@/lib/hatchlog-api'
 import { revalidatePath } from 'next/cache'
 
 export type WebAccount = {
@@ -25,7 +25,7 @@ export type BindResult =
 export async function getActiveWebAccounts(): Promise<WebAccount[]> {
   await requirePaymentAdminAction()
 
-  throw new Error('Not available: use Nest admin API extension for web account listing')
+  return (await adminListUsersApi()) as WebAccount[]
 }
 
 export async function bindDesktopToWebAccount(

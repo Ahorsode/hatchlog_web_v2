@@ -22,7 +22,7 @@ import {
   YAxis,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
-import type { RevenueVelocityPoint, StrategicPriority } from '@/lib/analytics/executive-metrics'
+import type { RevenueVelocityPoint, StrategicPriority } from '@/lib/analytics/types'
 
 interface ExecutiveDashboardProps {
   stats: {

@@ -1,5 +1,9 @@
 'use server'
 
+/**
+ * UI feature flags from Nest farm.subscriptionTier.
+ * Nest API remains the authority for paid access; this only gates UI chrome.
+ */
 import { getFarm, listTeamMembers } from './hatchlog-api'
 
 type SubscriptionTier = 'BASIC' | 'STANDARD' | 'PREMIUM'

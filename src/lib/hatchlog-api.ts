@@ -405,6 +405,23 @@ export async function createEggCategoryApi(body: Record<string, unknown>) {
   return requestJson('/api/v1/egg-categories', { method: 'POST', body })
 }
 
+export async function updateEggCategoryApi(
+  id: string,
+  body: Record<string, unknown>,
+) {
+  return requestJson(`/api/v1/egg-categories/${id}`, {
+    method: 'PATCH',
+    body,
+  })
+}
+
+export async function deleteEggCategoryApi(id: string, farmId: string) {
+  return requestJson(`/api/v1/egg-categories/${id}`, {
+    method: 'DELETE',
+    query: { farm_id: farmId },
+  })
+}
+
 // --- Feed formulations ---
 
 export async function listFeedFormulations(farmId: string) {
@@ -1249,6 +1266,34 @@ export async function adminListLicensesApi() {
 
 export async function adminGetLicenseApi(licenseId: string) {
   return adminFetch<unknown>(`/api/v1/admin/licenses/${licenseId}`)
+}
+
+export async function adminGetDeviceByHardwareApi(hardwareId: string) {
+  return adminFetch<{
+    farmId: string
+    farmName: string
+    subscriptionTier: string
+    status: string
+    licenseExpiresAt: string | null
+    lastSync: string | null
+    hardwareId: string | null
+    deviceName: string | null
+    deviceType: string | null
+  }>(`/api/v1/admin/licenses/by-hardware/${encodeURIComponent(hardwareId)}`)
+}
+
+export async function adminPaymentDashboardApi() {
+  return adminFetch<unknown>('/api/v1/admin/payments/dashboard')
+}
+
+export async function adminListActivityApi(limit = 100) {
+  return adminFetch<unknown[]>('/api/v1/admin/activity', {
+    query: { limit: String(limit) },
+  })
+}
+
+export async function adminListUsersApi() {
+  return adminFetch<unknown[]>('/api/v1/admin/users')
 }
 
 export async function adminPostApi<T = unknown>(

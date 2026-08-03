@@ -1,7 +1,10 @@
 'use server'
 
 import { getAdminSession } from '@/lib/admin-session'
-import { adminGetFarmApi } from '@/lib/hatchlog-api'
+import {
+  adminGetDeviceByHardwareApi,
+  adminGetFarmApi,
+} from '@/lib/hatchlog-api'
 
 export type AdminFarmDevice = {
   id: string
@@ -40,9 +43,23 @@ export async function getDevicesForFarm(farmId: string) {
   }
 }
 
-export async function getDeviceByHardwareId(_hardwareId: string): Promise<AdminDeviceLookup | null> {
+export async function getDeviceByHardwareId(
+  hardwareId: string,
+): Promise<AdminDeviceLookup | null> {
   const adminSession = await getAdminSession()
-  if (!adminSession || !_hardwareId.trim()) return null
+  if (!adminSession || !hardwareId.trim()) return null
 
-  throw new Error('Not available: use Nest admin API extension for device lookup by hardware ID')
+  try {
+    const device = await adminGetDeviceByHardwareApi(hardwareId.trim())
+    return {
+      farmName: device.farmName,
+      subscriptionTier: String(device.subscriptionTier ?? ''),
+      status: device.status,
+      licenseExpiresAt: device.licenseExpiresAt,
+      lastSync: device.lastSync,
+    }
+  } catch (error) {
+    console.error('[getDeviceByHardwareId]', error)
+    return null
+  }
 }

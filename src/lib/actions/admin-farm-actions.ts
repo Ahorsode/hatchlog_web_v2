@@ -5,6 +5,7 @@ import { requirePaymentAdminAction } from '@/lib/admin-auth'
 import {
   adminListFarmsApi,
   adminGetFarmApi,
+  adminListActivityApi,
   adminPostApi,
   adminPatchApi,
 } from '@/lib/hatchlog-api'
@@ -71,9 +72,9 @@ function revalidateFarmAdminPaths(farmId: string) {
   revalidatePath('/admin/licenses/issue')
 }
 
-export async function adminListActivity(_limit = 100): Promise<AdminActivityRow[]> {
+export async function adminListActivity(limit = 100): Promise<AdminActivityRow[]> {
   await requirePaymentAdminAction()
-  throw new Error('Not available: use Nest admin API extension for activity logs')
+  return (await adminListActivityApi(limit)) as AdminActivityRow[]
 }
 
 export async function adminListFarms(): Promise<AdminFarmRow[]> {
