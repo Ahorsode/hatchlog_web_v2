@@ -1,0 +1,1086 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  firstname             String?
+  surname               String?
+  email                 String?                @unique
+  emailVerified         DateTime?              @map("email_verified")
+  image                 String?
+  role                  Role                   @default(OWNER)
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  name                  String?
+  phoneNumber           String?                @unique @map("phone_number")
+  middleName            String?                @map("middle_name")
+  password              String?
+  mustChangePassword    Boolean                @default(false) @map("must_change_password")
+  sessionVersion        Int                    @default(1) @map("session_version")
+  securityNotice        String?                @map("security_notice")
+  securityRevokedAt     DateTime?              @map("security_revoked_at")
+  accounts              Account[]
+  auditLogs             AuditLog[]
+  batches               Livestock[]
+  feedingLogs           FeedingLog[]
+  deleteLogs            DeleteLog[]
+  eggProductions        EggProduction[]
+  expenses              Expense[]
+  memberships           FarmMember[]
+  farms                 Farm[]
+  financialTransactions FinancialTransaction[]
+  issuedLicenses        IssuedLicense[]
+  insertLogs            InsertLog[]
+  inventory             Inventory[]
+  mortalities           HealthMortality[]
+  orders                Order[]
+  sales                 Sale[]
+  sessions              Session[]
+  deviceRegistrations   DeviceRegistration[]
+  subscriptionEvents     SubscriptionEvent[]
+  userPermissions       UserPermission[]
+  weightRecords         WeightRecord[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  // Index relation columns so auth account lookups avoid table scans at scale.
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  deviceType   String?  @map("device_type")
+  farmId       String?  @map("farm_id")
+  loginTime    DateTime @default(now()) @map("login_time")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model AdminUser {
+  id                    String                   @id @default(cuid())
+  username              String                   @unique
+  passwordHash          String                   @map("password_hash")
+  isActive              Boolean                  @default(true) @map("is_active")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  lastLoginAt           DateTime?                @map("last_login_at")
+  licenseRenewalHistory AdminLicenseRenewalLog[]
+  issuedLicenses        IssuedLicense[]
+  manualLicensePayments ManualLicensePayment[]
+
+  @@map("admin_user")
+}
+
+model Farm {
+  id                    String                 @id @default(cuid())
+  name                  String
+  location              String?
+  capacity              Int
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  userId                String                 @default("user_placeholder")
+  subscriptionTier      SubscriptionTier       @default(BASIC)
+  masterLicenseStatus   String?                @default("NO_TRIAL") @map("master_license_status")
+  trialStartedAt        DateTime?              @map("trial_started_at")
+  trialExpiresAt        DateTime?              @map("trial_expires_at")
+  trialExhaustedAt      DateTime?              @map("trial_exhausted_at")
+  batches               Livestock[]
+  customers             Customer[]
+  feedingLogs           FeedingLog[]
+  deviceRegistrations   DeviceRegistration[]
+  subscriptionEvents     SubscriptionEvent[]
+  issuedLicenses        IssuedLicense[]
+  manualLicensePayments ManualLicensePayment[]
+  eggCategories         EggCategory[]
+  eggProduction         EggProduction[]
+  expenses              Expense[]
+  expenseAllocations    ExpenseAllocation[]
+  members               FarmMember[]
+  settings              FarmSettings?
+  salesSettings         SalesSettings?
+  user                  User                   @relation(fields: [userId], references: [id])
+  feedFormulations      FeedFormulation[]
+  financialTransactions FinancialTransaction[]
+  healthRecords         HealthRecord[]
+  houses                House[]
+  inventory             Inventory[]
+  invitations           Invitation[]
+  isolationRooms        IsolationRoom[]
+  medications           MedicationSchedule[]
+  mortality             HealthMortality[]
+  orders                Order[]
+  orderItemBatchAllocations OrderItemBatchAllocation[]
+  saleItems             SaleItem[]
+  sales                 Sale[]
+  subscription          Subscription?
+  suppliers             Supplier[]
+  userPermissions       UserPermission[]
+  vaccinations          VaccinationSchedule[]
+  weightRecords         WeightRecord[]
+
+  @@index([userId])
+  @@map("farms")
+}
+
+model House {
+  id                 String      @id @default(cuid())
+  farmId             String
+  name               String
+  capacity           Int
+  currentTemperature Decimal?    @db.Decimal(5, 2)
+  currentHumidity    Decimal?    @db.Decimal(5, 2)
+  userId             String      @default("user_placeholder")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  isIsolation        Boolean     @default(false)
+  batches            Livestock[]
+  farm               Farm        @relation(fields: [farmId], references: [id])
+
+  @@index([userId])
+  @@index([farmId])
+  @@map("houses")
+}
+
+model Livestock {
+  id                   String                @id @default(cuid())
+  status               String                @default("active")
+  arrivalDate          DateTime
+  breedType            String
+  createdAt            DateTime              @default(now())
+  currentCount         Int
+  houseId              String
+  initialCount         Int
+  updatedAt            DateTime              @updatedAt
+  userId               String                @default("user_placeholder")
+  farmId               String                @default("farm_placeholder")
+  batchName            String                @default("New Batch")
+  carriage_inward      Decimal?              @db.Decimal(15, 2)
+  growthTargetOverride String?
+  growth_target        String?
+  initialCostActual    Decimal?              @db.Decimal(15, 2)
+  initialCostCarriage  Decimal?              @db.Decimal(15, 2)
+  initialCostOther     Json?
+  initial_actual_cost  Decimal?              @db.Decimal(15, 2)
+  initial_other_costs  Json?
+  isolationCount       Int                   @default(0)
+  type                 LivestockType         @default(POULTRY_BROILER)
+  localBatchId         Int?                  @map("local_batch_id")
+  isDeleted            Boolean               @default(false) @map("is_deleted")
+  deletedAt            DateTime?             @map("deleted_at")
+  farm                 Farm                  @relation(fields: [farmId], references: [id])
+  house                House                 @relation(fields: [houseId], references: [id])
+  user                 User                  @relation(fields: [userId], references: [id])
+  feedingLogs          FeedingLog[]
+  eggProduction        EggProduction[]
+  expenses             Expense[]
+  expenseAllocations   ExpenseAllocation[]
+  healthRecords        HealthRecord[]
+  medications          MedicationSchedule[]
+  mortalityRecords     HealthMortality[]
+  orderItems           OrderItem[]
+  orderItemBatchAllocations OrderItemBatchAllocation[]
+  vaccinations         VaccinationSchedule[]
+  weightRecords        WeightRecord[]
+
+  @@index([status])
+  @@index([type])
+  @@index([userId])
+  @@index([farmId])
+  @@index([houseId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("batches")
+}
+
+model Inventory {
+  id                         String                      @id @default(cuid())
+  itemName                   String
+  stockLevel                 Decimal                     @db.Decimal(15, 2)
+  unit                       String
+  category                   String?
+  userId                     String                      @default("user_placeholder")
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  farmId                     String                      @default("farm_placeholder")
+  reorderLevel               Decimal?                    @default(500.00) @db.Decimal(15, 2)
+  costPerUnit                Decimal?                    @db.Decimal(15, 2)
+  usageType                  String?
+  eggCategoryId              String?
+  supplierId                 String?
+  isDeleted                  Boolean                     @default(false) @map("is_deleted")
+  deletedAt                  DateTime?                   @map("deleted_at")
+  feedingLogs                FeedingLog[]
+  feedFormulationIngredients FeedFormulationIngredient[]
+  eggCategory                EggCategory?                @relation(fields: [eggCategoryId], references: [id])
+  farm                       Farm                        @relation(fields: [farmId], references: [id])
+  supplier                   Supplier?                   @relation(fields: [supplierId], references: [id])
+  user                       User                        @relation(fields: [userId], references: [id])
+  orderItems                 OrderItem[]
+
+  @@index([userId])
+  @@index([farmId])
+  @@index([eggCategoryId])
+  @@index([supplierId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("inventory")
+}
+
+model InsertLog {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String   @map("user_id")
+  farmId      String   @map("farm_id")
+  targetTable String   @map("target_table")
+  recordId    String   @map("record_id")
+  insertedAt  DateTime @default(now()) @map("inserted_at")
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("insert_logs")
+}
+
+model DeleteLog {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId         String   @map("user_id")
+  farmId         String   @map("farm_id")
+  tableName      String   @map("table_name")
+  deletedDataCsv String   @map("deleted_data_csv")
+  deletedAt      DateTime @default(now()) @map("deleted_at")
+  reason         String?
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("delete_logs")
+}
+
+model FeedingLog {
+  id             String           @id @default(cuid())
+  batchId        String?          @map("batch_id")
+  feedTypeId     String?          @map("feed_type_id")
+  amountConsumed Decimal          @map("amount_consumed") @db.Decimal(15, 2)
+  logDate        DateTime         @default(now()) @map("log_date")
+  userId         String?          @map("user_id")
+  farmId         String           @default("farm_placeholder")
+  formulationId  String?          @map("formulation_id")
+  isDeleted      Boolean          @default(false) @map("is_deleted")
+  deletedAt      DateTime?        @map("deleted_at")
+  batch          Livestock?       @relation(fields: [batchId], references: [id])
+  farm           Farm             @relation(fields: [farmId], references: [id])
+  inventory      Inventory?       @relation(fields: [feedTypeId], references: [id])
+  formulation    FeedFormulation? @relation(fields: [formulationId], references: [id])
+  user           User?            @relation(fields: [userId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@index([feedTypeId])
+  @@index([formulationId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("daily_feeding_logs")
+}
+
+model HealthRecord {
+  id          String     @id @default(cuid())
+  batchId     String?    @map("batch_id")
+  recordType  String?    @map("record_type") @db.VarChar(50)
+  description String?
+  recordDate  DateTime   @default(now()) @map("record_date") @db.Date
+  farmId      String     @default("farm_placeholder")
+  batch       Livestock? @relation(fields: [batchId], references: [id])
+  farm        Farm       @relation(fields: [farmId], references: [id])
+
+  @@index([farmId])
+  @@index([batchId])
+  @@map("health_records")
+}
+
+model EggProduction {
+  id              String       @id @default(cuid())
+  batchId         String
+  eggsCollected   Int
+  logDate         DateTime
+  userId          String       @default("user_placeholder")
+  createdAt       DateTime     @default(now())
+  farmId          String       @default("farm_placeholder")
+  categoryId      String?
+  cratesCollected Decimal?     @db.Decimal(15, 2)
+  eggsRemaining   Int          @default(0)
+  qualityGrade    String?
+  unusableCount   Int          @default(0)
+  isSorted        Boolean      @default(false)
+  largeCount      Int          @default(0)
+  mediumCount     Int          @default(0)
+  smallCount      Int          @default(0)
+  isDeleted       Boolean      @default(false) @map("is_deleted")
+  deletedAt       DateTime?    @map("deleted_at")
+  batch           Livestock    @relation(fields: [batchId], references: [id])
+  category        EggCategory? @relation(fields: [categoryId], references: [id])
+  farm            Farm         @relation(fields: [farmId], references: [id])
+  user            User         @relation(fields: [userId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@index([categoryId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("egg_production")
+}
+
+model IsolationRoom {
+  id        String            @id @default(cuid())
+  farmId    String
+  name      String
+  capacity  Int
+  userId    String            @default("user_placeholder")
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  farm      Farm              @relation(fields: [farmId], references: [id])
+  records   HealthMortality[]
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("isolation_rooms")
+}
+
+model HealthMortality {
+  id              String          @id @default(cuid())
+  batchId         String
+  count           Int
+  reason          String?
+  logDate         DateTime
+  userId          String          @default("user_placeholder")
+  createdAt       DateTime        @default(now())
+  category        String?
+  farmId          String          @default("farm_placeholder")
+  subCategory     String?         @map("sub_category")
+  isolationRoomId String?         @map("isolation_room_id")
+  type            HealthEventType @default(DEAD)
+  isDeleted       Boolean         @default(false) @map("is_deleted")
+  deletedAt       DateTime?       @map("deleted_at")
+  batch           Livestock       @relation(fields: [batchId], references: [id])
+  farm            Farm            @relation(fields: [farmId], references: [id])
+  isolationRoom   IsolationRoom?  @relation(fields: [isolationRoomId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@index([isolationRoomId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("mortality")
+}
+
+model WeightRecord {
+  id            String    @id @default(cuid())
+  batchId       String
+  averageWeight Decimal   @db.Decimal(10, 3)
+  logDate       DateTime
+  userId        String    @default("user_placeholder")
+  farmId        String    @default("farm_placeholder")
+  createdAt     DateTime  @default(now())
+  batch         Livestock @relation(fields: [batchId], references: [id])
+  farm          Farm      @relation(fields: [farmId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([farmId])
+  @@index([batchId])
+  @@map("weight_records")
+}
+
+model Sale {
+  id           String     @id @default(cuid())
+  customerName String?
+  totalAmount  Decimal    @db.Decimal(15, 2)
+  saleDate     DateTime   @default(now())
+  status       String     @default("completed")
+  userId       String     @default("user_placeholder")
+  createdAt    DateTime   @default(now())
+  farmId       String     @default("farm_placeholder")
+  isDeleted    Boolean    @default(false) @map("is_deleted")
+  deletedAt    DateTime?  @map("deleted_at")
+  items        SaleItem[]
+  farm         Farm       @relation(fields: [farmId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@index([saleDate, status])
+  @@index([userId])
+  @@index([farmId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  saleId      String
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(15, 2)
+  totalPrice  Decimal @db.Decimal(15, 2)
+  farmId      String  @default("farm_placeholder")
+  farm        Farm    @relation(fields: [farmId], references: [id])
+  sale        Sale    @relation(fields: [saleId], references: [id])
+
+  @@index([farmId])
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+model FarmMember {
+  id        String   @id @default(cuid())
+  farmId    String
+  userId    String
+  role      Role     @default(WORKER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farm      Farm     @relation(fields: [farmId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([farmId, userId])
+  @@index([farmId])
+  @@index([userId])
+  @@map("farm_members")
+}
+
+model Invitation {
+  id          String   @id @default(cuid())
+  email       String?
+  role        Role     @default(WORKER)
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now()) @map("created_at")
+  farmId      String   @map("farm_id")
+  phoneNumber String?  @unique @map("phone_number")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  farm        Farm     @relation(fields: [farmId], references: [id])
+
+  @@unique([email, farmId])
+  @@index([farmId])
+  @@map("invitations")
+}
+
+model VaccinationSchedule {
+  id            String    @id @default(cuid())
+  batchId       String
+  vaccineName   String
+  scheduledDate DateTime
+  status        String    @default("PENDING")
+  notes         String?
+  quantity      Decimal?  @db.Decimal(15, 2)
+  usageType     String?
+  unit          String?
+  farmId        String    @default("farm_placeholder")
+  batch         Livestock @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  farm          Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([farmId])
+  @@map("vaccination_schedules")
+}
+
+model MedicationSchedule {
+  id             String    @id @default(cuid())
+  batchId        String
+  medicationName String
+  scheduledDate  DateTime
+  status         String    @default("PENDING")
+  notes          String?
+  quantity       Decimal?  @db.Decimal(15, 2)
+  usageType      String?
+  unit           String?
+  farmId         String    @default("farm_placeholder")
+  batch          Livestock @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  farm           Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([farmId])
+  @@map("medication_schedules")
+}
+
+model FarmSettings {
+  id                     String   @id @default(cuid())
+  farmId                 String   @unique
+  eggRecordReminderTime  String?  @default("18:00")
+  feedRecordReminderTime String?  @default("18:00")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  currency               String   @default("GHS")
+  growthTargetStandard   Int?     @map("growth_target_standard")
+  eggsPerCrate           Int      @default(30)
+  defaultEggUnit         String   @default("crate") @map("default_egg_unit")
+  allowEggUnitChange     Boolean  @default(false) @map("allow_egg_unit_change")
+  defaultEggSortMode     String   @default("unsorted") @map("default_egg_sort_mode")
+  allowEggSortModeChange Boolean  @default(false) @map("allow_egg_sort_mode_change")
+  farm                   Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@map("farm_settings")
+}
+
+model SalesSettings {
+  id                   String   @id @default(cuid())
+  farmId               String   @unique @map("farm_id")
+  allowBatchOverride   Boolean  @default(false) @map("allow_batch_override")
+  allowWorkerDiscounts Boolean  @default(false) @map("allow_worker_discounts")
+  defaultDiscountType  String   @default("item") @map("default_discount_type")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  farm                 Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@map("sales_settings")
+}
+
+model AuditLog {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tableName     String   @map("table_name")
+  recordId      String   @map("record_id")
+  attributeName String   @map("attribute_name")
+  oldValue      String?  @map("old_value")
+  newValue      String?  @map("new_value")
+  reason        String?
+  userId        String   @map("user_id")
+  farmId        String   @map("farm_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  actionType    String?  @map("action_type")
+  description   String?
+  metadata      Json?    @map("metadata")
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([farmId])
+  @@index([farmId, createdAt])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Expense {
+  id          String              @id @default(cuid())
+  farmId      String
+  userId      String              @map("user_id")
+  amount      Decimal             @db.Decimal(15, 2)
+  category    ExpenseCategory
+  description String?
+  expenseDate DateTime            @default(now()) @map("expense_date")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  batch_id    String?
+  supplierId  String?
+  isDeleted   Boolean             @default(false) @map("is_deleted")
+  deletedAt   DateTime?           @map("deleted_at")
+  allocations ExpenseAllocation[]
+  batches     Livestock?          @relation(fields: [batch_id], references: [id])
+  farm        Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  supplier    Supplier?           @relation(fields: [supplierId], references: [id])
+  user        User                @relation(fields: [userId], references: [id])
+
+  @@index([expenseDate, category])
+  @@index([farmId])
+  @@index([userId])
+  @@index([batch_id])
+  @@index([supplierId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@map("expenses")
+}
+
+model ExpenseAllocation {
+  id                   String    @id @default(cuid())
+  expenseId            String    @map("expense_id")
+  batchId              String    @map("batch_id")
+  farmId               String    @map("farm_id")
+  allocatedAmount      Decimal   @map("allocated_amount") @db.Decimal(15, 2)
+  allocationPercentage Decimal?  @map("allocation_percentage") @db.Decimal(7, 4)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  batch                Livestock @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  expense              Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  farm                 Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, batchId])
+  @@index([batchId])
+  @@index([farmId])
+  @@index([expenseId])
+  @@map("expense_allocations")
+}
+
+model UserPermission {
+  id               String  @id @default(cuid())
+  userId           String  @map("user_id")
+  farmId           String  @map("farm_id")
+  canViewFinance   Boolean @default(false) @map("can_view_finance")
+  canEditFinance   Boolean @default(false) @map("can_edit_finance")
+  canViewInventory Boolean @default(false) @map("can_view_inventory")
+  canEditInventory Boolean @default(false) @map("can_edit_inventory")
+  canViewBatches   Boolean @default(false) @map("can_view_batches")
+  canEditBatches   Boolean @default(false) @map("can_edit_batches")
+  canViewSales     Boolean @default(false) @map("can_view_sales")
+  canEditSales     Boolean @default(false) @map("can_edit_sales")
+  canViewEggs      Boolean @default(false) @map("can_view_eggs")
+  canEditEggs      Boolean @default(false) @map("can_edit_eggs")
+  canViewFeeding   Boolean @default(false) @map("can_view_feeding")
+  canEditFeeding   Boolean @default(false) @map("can_edit_feeding")
+  canViewHouses    Boolean @default(false) @map("can_view_houses")
+  canEditHouses    Boolean @default(false) @map("can_edit_houses")
+  canViewMortality Boolean @default(false) @map("can_view_mortality")
+  canEditMortality Boolean @default(false) @map("can_edit_mortality")
+  canViewHealth    Boolean @default(false) @map("can_view_health")
+  canEditHealth    Boolean @default(false) @map("can_edit_health")
+  canViewCustomers Boolean @default(false) @map("can_view_customers")
+  canEditCustomers Boolean @default(false) @map("can_edit_customers")
+  canViewTeam      Boolean @default(false) @map("can_view_team")
+  canEditTeam      Boolean @default(false) @map("can_edit_team")
+  farm             Farm    @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, farmId])
+  @@index([farmId])
+  @@index([userId])
+  @@map("user_permissions")
+}
+
+model GrowthStandards {
+  id            String        @id @default(cuid())
+  livestockType LivestockType
+  ageInDays     Int
+  targetWeight  Decimal       @db.Decimal(10, 3)
+  targetFeed    Decimal?      @db.Decimal(10, 3)
+  unit          String        @default("kg")
+  createdAt     DateTime      @default(now())
+
+  @@map("growth_standards")
+}
+
+model SubscriptionPlan {
+  id            String           @id @default(cuid())
+  name          String
+  tier          SubscriptionTier
+  price         Decimal          @db.Decimal(15, 2)
+  currency      String           @default("USD")
+  interval      String           @default("monthly")
+  features      Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id        String           @id @default(cuid())
+  farmId    String           @unique
+  planId    String
+  status    String           @default("ACTIVE")
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  farm      Farm             @relation(fields: [farmId], references: [id])
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([farmId])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+model Customer {
+  id                    String                 @id @default(cuid())
+  farmId                  String
+  name                    String
+  phone                   String?
+  email                   String?
+  address                 String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  balanceOwed             Decimal                @default(0) @db.Decimal(15, 2)
+  farm                    Farm                   @relation(fields: [farmId], references: [id])
+  orders                  Order[]
+  financialTransactions   FinancialTransaction[]
+
+  @@index([farmId])
+  @@map("customers")
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  farmId         String
+  customerId     String?
+  invoiceNumber  Int?        @unique @default(dbgenerated("nextval('order_invoice_number_seq'::regclass)")) @map("invoice_number")
+  subtotalAmount Decimal     @default(0) @map("subtotal_amount") @db.Decimal(15, 2)
+  taxAmount      Decimal     @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount    Decimal     @db.Decimal(15, 2)
+  currency       String      @default("USD")
+  status         String      @default("PENDING")
+  discountAmount Decimal     @default(0) @db.Decimal(15, 2)
+  paymentMethod      String? @map("payment_method")
+  paymentReference   String? @map("payment_reference")
+  paymentAccountName String? @map("payment_account_name")
+  cashReceived       Decimal @default(0) @map("cash_received") @db.Decimal(15, 2)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  orderDate      DateTime    @default(now()) @map("order_date")
+  paidAt         DateTime?   @map("paid_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  userId         String      @default("user_placeholder") @map("user_id")
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+  deletedAt      DateTime?   @map("deleted_at")
+  items          OrderItem[]
+  financialTransaction FinancialTransaction?
+  customer       Customer?   @relation(fields: [customerId], references: [id])
+  farm           Farm        @relation(fields: [farmId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+
+  @@index([orderDate, status])
+  @@index([customerId])
+  @@index([userId])
+  @@index([farmId, isDeleted])
+  @@index([farmId, deletedAt])
+  @@index([farmId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String     @id @default(cuid())
+  orderId     String
+  description String
+  quantity    Int
+  unitPrice   Decimal    @db.Decimal(15, 2)
+  totalPrice  Decimal    @db.Decimal(15, 2)
+  inventoryId String?
+  livestockId String?
+  eggAllocationMode String? @map("egg_allocation_mode")
+  eggBatchId        String? @map("egg_batch_id")
+  lineDiscountAmount Decimal @default(0) @map("line_discount_amount") @db.Decimal(15, 2)
+  lineDiscountType   String  @default("flat") @map("line_discount_type")
+  inventory        Inventory?                 @relation(fields: [inventoryId], references: [id])
+  batch            Livestock?                 @relation(fields: [livestockId], references: [id])
+  order            Order                      @relation(fields: [orderId], references: [id])
+  batchAllocations OrderItemBatchAllocation[]
+
+  @@index([orderId])
+  @@index([inventoryId])
+  @@index([livestockId])
+  @@map("order_items")
+}
+
+model OrderItemBatchAllocation {
+  id            String    @id @default(cuid())
+  orderItemId   String    @map("order_item_id")
+  batchId       String    @map("batch_id")
+  farmId        String    @map("farm_id")
+  eggsUsed      Int       @map("eggs_used")
+  revenueAmount Decimal   @map("revenue_amount") @db.Decimal(15, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  orderItem     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  batch         Livestock @relation(fields: [batchId], references: [id])
+  farm          Farm      @relation(fields: [farmId], references: [id])
+
+  @@index([orderItemId])
+  @@index([batchId, farmId])
+  @@index([farmId])
+  @@map("order_item_batch_allocations")
+}
+
+model FeedFormulation {
+  id              String                      @id @default(cuid())
+  farmId          String
+  name            String
+  notes           String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  targetLivestock LivestockType?
+  type            FeedType
+  stockLevel      Decimal                     @default(0) @db.Decimal(10, 2)
+  feedingLogs     FeedingLog[]
+  ingredients     FeedFormulationIngredient[]
+  farm            Farm                        @relation(fields: [farmId], references: [id])
+
+  @@index([farmId])
+  @@map("feed_formulations")
+}
+
+model FeedFormulationIngredient {
+  id            String          @id @default(cuid())
+  formulationId String
+  inventoryId   String
+  quantity      Decimal         @db.Decimal(10, 2)
+  unit          String
+  formulation   FeedFormulation @relation(fields: [formulationId], references: [id])
+  inventory     Inventory       @relation(fields: [inventoryId], references: [id])
+
+  @@index([formulationId])
+  @@index([inventoryId])
+  @@map("feed_formulation_ingredients")
+}
+
+model Supplier {
+  id          String      @id @default(cuid())
+  farmId      String
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  balanceOwed Decimal     @default(0) @db.Decimal(15, 2)
+  expenses    Expense[]
+  inventory   Inventory[]
+  farm        Farm        @relation(fields: [farmId], references: [id])
+
+  @@index([farmId])
+  @@map("suppliers")
+}
+
+model EggCategory {
+  id              String          @id @default(cuid())
+  farmId          String
+  name            String
+  description     String?
+  createdAt       DateTime        @default(now())
+  isStockInternal Boolean         @default(true)
+  sellingPrice    Decimal         @default(0) @db.Decimal(15, 2)
+  unitSize        Int             @default(30)
+  updatedAt       DateTime        @default(now())
+  farm            Farm            @relation(fields: [farmId], references: [id])
+  eggProductions  EggProduction[]
+  inventoryItems  Inventory[]
+
+  @@index([farmId])
+  @@map("egg_categories")
+}
+
+model DeviceRegistration {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId                String                   @map("farm_id")
+  userId                String?                  @map("user_id")
+  deviceId              String?                  @map("deviceId")
+  deviceName            String?                  @map("deviceName")
+  deviceType            String?                  @map("deviceType")
+  lastSync              DateTime                 @default(now()) @map("lastSync")
+  isActive              Boolean                  @default(true) @map("isActive")
+  registeredAt          DateTime                 @default(now()) @map("created_at")
+  licenseKey            String?                  @unique @map("licenseKey")
+  activationKeyStatus   String                   @default("UNUSED") @map("activation_key_status")
+  status                String                   @default("CLOUD_TRIAL") @map("license_status")
+  hardwareId            String?                  @unique(map: "device_registrations_hardware_id_key") @map("hardware_id")
+  licenseExpiresAt      DateTime?                @map("license_expires_at")
+  graceRescueUsedAt     DateTime?                @map("grace_rescue_used_at")
+  lastActivationToken   String?                  @map("lastActivationToken")
+  lastPaymentAt         DateTime?                @map("lastPaymentAt")
+  activatedByAdminId    String?                  @map("activatedByAdminId")
+  farm                  Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user                  User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  renewalLogs           AdminLicenseRenewalLog[]
+  manualLicensePayments ManualLicensePayment[]
+
+  @@unique([farmId, deviceId])
+  @@index([farmId])
+  @@index([userId])
+  @@index([status])
+  @@index([licenseExpiresAt])
+  @@map("device_registrations")
+}
+
+model AdminLicenseRenewalLog {
+  id                    String             @id @default(cuid())
+  adminUserId           String             @map("admin_user_id")
+  deviceRegistrationId  String             @map("device_registration_id") @db.Uuid
+  hardwareId            String             @map("hardware_id")
+  durationMonths        Int                @map("duration_months")
+  previousLicenseStatus String?            @map("previous_license_status")
+  newLicenseStatus      String             @map("new_license_status")
+  previousExpiresAt     DateTime?          @map("previous_expires_at")
+  newExpiresAt          DateTime           @map("new_expires_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  adminUser             AdminUser          @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+  deviceRegistration    DeviceRegistration @relation(fields: [deviceRegistrationId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId, createdAt])
+  @@index([deviceRegistrationId, createdAt])
+  @@index([hardwareId, createdAt])
+  @@map("admin_license_renewal_log")
+}
+
+model ManualLicensePayment {
+  id                   String             @id @default(cuid())
+  farmId               String             @map("farm_id")
+  deviceRegistrationId String             @map("device_registration_id") @db.Uuid
+  adminUserId          String             @map("admin_user_id")
+  hardwareId           String             @map("hardware_id")
+  amount               Decimal            @db.Decimal(15, 2)
+  currency             String             @default("GHS")
+  durationDays         Int                @map("duration_days")
+  targetExpiryDate     DateTime           @map("target_expiry_date")
+  paymentModeNote      String             @map("payment_mode_note") @db.Text
+  activationToken      String             @unique @map("activation_token")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  adminUser            AdminUser          @relation(fields: [adminUserId], references: [id])
+  deviceRegistration   DeviceRegistration @relation(fields: [deviceRegistrationId], references: [id], onDelete: Cascade)
+  farm                 Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, createdAt])
+  @@index([adminUserId])
+  @@index([deviceRegistrationId])
+  @@map("manual_license_payments")
+}
+
+model SubscriptionEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  farmId    String   @map("farm_id")
+  userId    String   @map("user_id")
+  eventType String   @map("event_type")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@index([farmId, createdAt])
+  @@map("subscription_events")
+}
+
+model IssuedLicense {
+  id                   String    @id @default(cuid())
+  farmId               String    @map("farm_id")
+  adminUserId          String    @map("admin_user_id")
+  accountUserId        String?   @map("account_user_id")
+  hardwareId           String    @map("hardware_id")
+  desktopFarmId        String    @map("desktop_farm_id")
+  durationDays         Int       @map("duration_days")
+  targetExpiryDate     DateTime  @map("target_expiry_date")
+  activationToken      String    @unique @map("activation_token")
+  transactionReference String    @map("transaction_reference") @db.Text
+  issuedAt             DateTime  @default(now()) @map("issued_at")
+  adminUser            AdminUser @relation(fields: [adminUserId], references: [id])
+  farm                 Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  accountUser          User?     @relation(fields: [accountUserId], references: [id], onDelete: SetNull)
+
+  @@index([farmId, issuedAt])
+  @@index([adminUserId, issuedAt])
+  @@index([accountUserId])
+  @@map("issued_licenses")
+}
+
+model FinancialTransaction {
+  id                String    @id @default(cuid())
+  farmId            String    @map("farm_id")
+  userId            String    @map("user_id")
+  orderId           String?   @unique @map("order_id")
+  customerId        String?   @map("customer_id")
+  type              String
+  category          String
+  amount            Decimal   @db.Decimal(15, 2)
+  depositAmount     Decimal   @default(0) @map("deposit_amount") @db.Decimal(15, 2)
+  outstandingCredit Decimal   @default(0) @map("outstanding_credit") @db.Decimal(15, 2)
+  paymentStatus     String    @map("payment_status")
+  paymentMethod     String    @map("payment_method")
+  referenceNum      String?   @map("reference_num")
+  transactionDate   DateTime  @map("transaction_date")
+  description       String?
+  isDeleted         Boolean   @default(false) @map("is_deleted")
+  deletedAt         DateTime? @map("deleted_at")
+  settledAt         DateTime? @map("settled_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  farm              Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order             Order?    @relation(fields: [orderId], references: [id])
+  customer          Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([farmId, type, transactionDate])
+  @@index([userId])
+  @@index([farmId, deletedAt])
+  @@index([farmId, isDeleted])
+  @@index([customerId])
+  @@map("financial_transactions")
+}
+
+enum HealthEventType {
+  SICK
+  DEAD
+}
+
+enum LivestockType {
+  POULTRY_BROILER
+  POULTRY_LAYER
+  CATTLE
+  SHEEP_GOAT
+  PIG
+  OTHER
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  WORKER
+  ACCOUNTANT
+  FINANCE_OFFICER
+  CASHIER
+}
+
+enum ExpenseCategory {
+  FEED
+  MEDICATION
+  EQUIPMENT
+  UTILITIES
+  SALARY
+  MAINTENANCE
+  OTHER
+  LIVESTOCK_PURCHASE
+  TRANSPORT
+}
+
+enum SubscriptionTier {
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
+enum FeedType {
+  PRE_STARTER
+  STARTER
+  GROWER
+  FINISHER
+  BREEDER
+  CUSTOM
+}

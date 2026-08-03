@@ -1,0 +1,10 @@
+CREATE INDEX IF NOT EXISTS "insert_logs_farm_id_idx" ON "insert_logs"("farm_id");
+CREATE INDEX IF NOT EXISTS "delete_logs_farm_id_idx" ON "delete_logs"("farm_id");
+CREATE INDEX IF NOT EXISTS "farm_members_farmId_idx" ON "farm_members"("farmId");
+CREATE INDEX IF NOT EXISTS "farm_settings_farmId_idx" ON "farm_settings"("farmId");
+CREATE INDEX IF NOT EXISTS "subscriptions_farmId_idx" ON "subscriptions"("farmId");
+CREATE INDEX IF NOT EXISTS "customers_farmId_idx" ON "customers"("farmId");
+CREATE INDEX IF NOT EXISTS "feed_formulations_farmId_idx" ON "feed_formulations"("farmId");
+CREATE INDEX IF NOT EXISTS "suppliers_farmId_idx" ON "suppliers"("farmId");
+CREATE INDEX IF NOT EXISTS "egg_categories_farmId_idx" ON "egg_categories"("farmId");
+CREATE INDEX IF NOT EXISTS "device_registrations_farm_id_idx" ON "device_registrations"("farm_id");

@@ -1,0 +1,49 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+src/.env
+
+# google oauth / secrets
+client_secret*.json
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Dev artifacts
+scratch.ts
+scratch/
+skills-lock.json
+task.md
+walkthrough.md
+build_log.txt
+
+# Sentry Config File
+.env.sentry-build-plugin

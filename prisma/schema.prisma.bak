@@ -1,0 +1,747 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String           @id @default(cuid())
+  firstname          String?
+  surname            String?
+  email              String?          @unique
+  emailVerified      DateTime?        @map("email_verified")
+  image              String?
+  role               Role             @default(OWNER)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  name               String?
+  phoneNumber        String?          @unique @map("phone_number")
+  middleName         String?          @map("middle_name")
+  password           String?
+  mustChangePassword Boolean          @default(false) @map("must_change_password")
+  accounts           Account[]
+  batches            Livestock[]
+  feedingLogs        FeedingLog[]
+  expenses           Expense[]
+  memberships        FarmMember[]
+  farms              Farm[]
+  sessions           Session[]
+  userPermissions    UserPermission[]
+  sales              Sale[]
+  inventory          Inventory[]
+  eggProductions     EggProduction[]
+  mortalities        HealthMortality[]
+  weightRecords      WeightRecord[]
+  orders             Order[]
+  insertLogs         InsertLog[]
+  deleteLogs         DeleteLog[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  farmId       Int?     @map("farm_id")
+  loginTime    DateTime @default(now()) @map("login_time")
+  deviceType   String?  @map("device_type")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Farm {
+  id               Int                   @id @default(autoincrement())
+  name             String
+  location         String?
+  capacity         Int
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  userId           String                @default("user_placeholder")
+  subscriptionTier SubscriptionTier      @default(BASIC)
+  batches          Livestock[]
+  customers        Customer[]
+  feedingLogs      FeedingLog[]
+  eggProduction    EggProduction[]
+  expenses         Expense[]
+  members          FarmMember[]
+  settings         FarmSettings?
+  user             User                  @relation(fields: [userId], references: [id])
+  feedFormulations FeedFormulation[]
+  healthRecords    HealthRecord[]
+  houses           House[]
+  inventory        Inventory[]
+  invitations      Invitation[]
+  medications      MedicationSchedule[]
+  mortality        HealthMortality[]
+  isolationRooms   IsolationRoom[]
+  orders           Order[]
+  saleItems        SaleItem[]
+  sales            Sale[]
+  subscription     Subscription?
+  userPermissions  UserPermission[]
+  vaccinations     VaccinationSchedule[]
+  weightRecords    WeightRecord[]
+  suppliers        Supplier[]
+  eggCategories    EggCategory[]
+
+  @@index([userId])
+  @@map("farms")
+}
+
+model House {
+  id                 Int         @id @default(autoincrement())
+  farmId             Int
+  name               String
+  capacity           Int
+  currentTemperature Decimal?    @db.Decimal(5, 2)
+  currentHumidity    Decimal?    @db.Decimal(5, 2)
+  userId             String      @default("user_placeholder")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  batches            Livestock[]
+  farm               Farm        @relation(fields: [farmId], references: [id])
+  isIsolation        Boolean     @default(false)
+
+  @@index([userId])
+  @@index([farmId])
+  @@map("houses")
+}
+
+model Livestock {
+  id                   Int                   @id @default(autoincrement())
+  status               String                @default("active")
+  arrivalDate          DateTime
+  breedType            String
+  createdAt            DateTime              @default(now())
+  currentCount         Int
+  houseId              Int
+  initialCount         Int
+  updatedAt            DateTime              @updatedAt
+  userId               String                @default("user_placeholder")
+  farmId               Int                   @default(1)
+  batchName            String                @default("New Batch")
+  localBatchId         Int?                  @map("local_batch_id")
+  type                 LivestockType         @default(POULTRY_BROILER)
+  carriage_inward      Decimal?              @db.Decimal(15, 2)
+  growth_target        String?
+  initial_actual_cost  Decimal?              @db.Decimal(15, 2)
+  initial_other_costs  Json?
+  initialCostActual    Decimal?              @db.Decimal(15, 2)
+  initialCostCarriage  Decimal?              @db.Decimal(15, 2)
+  initialCostOther     Json?
+  growthTargetOverride String?
+  isolationCount       Int                   @default(0)
+  farm                 Farm                  @relation(fields: [farmId], references: [id])
+  house                House                 @relation(fields: [houseId], references: [id])
+  user                 User                  @relation(fields: [userId], references: [id])
+  feedingLogs          FeedingLog[]
+  eggProduction        EggProduction[]
+  expenses             Expense[]
+  healthRecords        HealthRecord[]
+  medications          MedicationSchedule[]
+  mortalityRecords     HealthMortality[]
+  orderItems           OrderItem[]
+  vaccinations         VaccinationSchedule[]
+  weightRecords        WeightRecord[]
+
+  @@index([status])
+  @@index([type])
+  @@index([userId])
+  @@index([farmId])
+  @@map("batches")
+}
+
+model Inventory {
+  id                         Int                         @id @default(autoincrement())
+  itemName                   String
+  stockLevel                 Decimal                     @db.Decimal(15, 2)
+  unit                       String
+  category                   String?
+  costPerUnit                Decimal?                    @db.Decimal(15, 2)
+  userId                     String                      @default("user_placeholder")
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  farmId                     Int                         @default(1)
+  reorderLevel               Decimal?                    @default(500.00) @db.Decimal(15, 2)
+  feedingLogs                FeedingLog[]
+  feedFormulationIngredients FeedFormulationIngredient[]
+  farm                       Farm                        @relation(fields: [farmId], references: [id])
+  supplierId                 Int?
+  supplier                   Supplier?                   @relation(fields: [supplierId], references: [id])
+  eggCategoryId              Int?
+  eggCategory                EggCategory?                @relation(fields: [eggCategoryId], references: [id])
+  orderItems                 OrderItem[]
+  user                       User                        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([farmId])
+  @@map("inventory")
+}
+
+model InsertLog {
+  id          Int      @id @default(autoincrement())
+  userId      String   @map("user_id")
+  farmId      Int      @map("farm_id")
+  targetTable String   @map("target_table")
+  recordId    Int      @map("record_id")
+  insertedAt  DateTime @default(now()) @map("inserted_at")
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("insert_logs")
+}
+
+model DeleteLog {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id")
+  farmId         Int      @map("farm_id")
+  tableName      String   @map("table_name")
+  deletedDataCsv String   @map("deleted_data_csv")
+  deletedAt      DateTime @default(now()) @map("deleted_at")
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@map("delete_logs")
+}
+
+
+model FeedingLog {
+  id             Int              @id @default(autoincrement())
+  batchId        Int?             @map("batch_id")
+  feedTypeId     Int?             @map("feed_type_id")
+  amountConsumed Decimal          @map("amount_consumed") @db.Decimal(15, 2)
+  logDate        DateTime         @default(now()) @map("log_date")
+  userId         String?          @map("user_id")
+  farmId         Int              @default(1)
+  formulationId  Int?             @map("formulation_id")
+  batch          Livestock?       @relation(fields: [batchId], references: [id])
+  farm           Farm             @relation(fields: [farmId], references: [id])
+  inventory      Inventory?       @relation(fields: [feedTypeId], references: [id])
+  formulation    FeedFormulation? @relation(fields: [formulationId], references: [id])
+  user           User?            @relation(fields: [userId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@map("daily_feeding_logs")
+}
+
+model HealthRecord {
+  id          Int        @id @default(autoincrement())
+  batchId     Int?       @map("batch_id")
+  recordType  String?    @map("record_type") @db.VarChar(50)
+  description String?
+  recordDate  DateTime   @default(now()) @map("record_date") @db.Date
+  farmId      Int        @default(1)
+  batch       Livestock? @relation(fields: [batchId], references: [id])
+  farm        Farm       @relation(fields: [farmId], references: [id])
+
+  @@index([farmId])
+  @@map("health_records")
+}
+
+model EggProduction {
+  id            Int       @id @default(autoincrement())
+  batchId       Int
+  eggsCollected Int
+  logDate       DateTime
+  userId        String    @default("user_placeholder")
+  createdAt     DateTime  @default(now())
+  farmId        Int       @default(1)
+  qualityGrade  String?
+  unusableCount Int       @default(0)
+  eggsRemaining Int       @default(0)
+  batch         Livestock @relation(fields: [batchId], references: [id])
+  farm          Farm      @relation(fields: [farmId], references: [id])
+  categoryId    Int?
+  category      EggCategory? @relation(fields: [categoryId], references: [id])
+  cratesCollected Decimal? @db.Decimal(15, 2)
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@map("egg_production")
+}
+
+model IsolationRoom {
+  id        Int      @id @default(autoincrement())
+  farmId    Int
+  name      String
+  capacity  Int
+  userId    String   @default("user_placeholder")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farm      Farm     @relation(fields: [farmId], references: [id])
+  records   HealthMortality[]
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("isolation_rooms")
+}
+
+model HealthMortality {
+  id              Int             @id @default(autoincrement())
+  batchId         Int
+  count           Int
+  type            HealthEventType @default(DEAD)
+  reason          String?
+  logDate         DateTime
+  userId          String          @default("user_placeholder")
+  createdAt       DateTime        @default(now())
+  category        String?
+  farmId          Int             @default(1)
+  subCategory     String?         @map("sub_category")
+  isolationRoomId Int?            @map("isolation_room_id")
+  
+  batch           Livestock       @relation(fields: [batchId], references: [id])
+  farm            Farm            @relation(fields: [farmId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+  isolationRoom   IsolationRoom?  @relation(fields: [isolationRoomId], references: [id])
+
+  @@index([batchId, logDate])
+  @@index([userId])
+  @@index([farmId])
+  @@map("mortality")
+}
+
+enum HealthEventType {
+  SICK
+  DEAD
+}
+
+model WeightRecord {
+  id            Int       @id @default(autoincrement())
+  batchId       Int
+  averageWeight Decimal   @db.Decimal(10, 3)
+  logDate       DateTime
+  userId        String    @default("user_placeholder")
+  farmId        Int       @default(1)
+  createdAt     DateTime  @default(now())
+  batch         Livestock @relation(fields: [batchId], references: [id])
+  farm          Farm      @relation(fields: [farmId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([farmId])
+  @@map("weight_records")
+}
+
+model Sale {
+  id           Int        @id @default(autoincrement())
+  customerName String?
+  totalAmount  Decimal    @db.Decimal(15, 2)
+  saleDate     DateTime   @default(now())
+  status       String     @default("completed")
+  userId       String     @default("user_placeholder")
+  createdAt    DateTime   @default(now())
+  farmId       Int        @default(1)
+  items        SaleItem[]
+  farm         Farm       @relation(fields: [farmId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@index([saleDate, status])
+  @@index([userId])
+  @@index([farmId])
+  @@map("sales")
+}
+
+model SaleItem {
+  id          Int     @id @default(autoincrement())
+  saleId      Int
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(15, 2)
+  totalPrice  Decimal @db.Decimal(15, 2)
+  farmId      Int     @default(1)
+  farm        Farm    @relation(fields: [farmId], references: [id])
+  sale        Sale    @relation(fields: [saleId], references: [id])
+
+  @@index([farmId])
+  @@map("sale_items")
+}
+
+model FarmMember {
+  id        Int      @id @default(autoincrement())
+  farmId    Int
+  userId    String
+  role      Role     @default(WORKER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farm      Farm     @relation(fields: [farmId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([farmId, userId])
+  @@map("farm_members")
+}
+
+model Invitation {
+  id          Int      @id @default(autoincrement())
+  email       String?
+  role        Role     @default(WORKER)
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now()) @map("created_at")
+  farmId      Int      @map("farm_id")
+  phoneNumber String?  @unique @map("phone_number")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  farm        Farm     @relation(fields: [farmId], references: [id])
+
+  @@unique([email, farmId])
+  @@index([farmId])
+  @@map("invitations")
+}
+
+model VaccinationSchedule {
+  id            Int       @id @default(autoincrement())
+  batchId       Int
+  vaccineName   String
+  scheduledDate DateTime
+  status        String    @default("PENDING")
+  notes         String?
+  farmId        Int       @default(1)
+  batch         Livestock @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  farm          Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([farmId])
+  @@map("vaccination_schedules")
+}
+
+model MedicationSchedule {
+  id             Int       @id @default(autoincrement())
+  batchId        Int
+  medicationName String
+  scheduledDate  DateTime
+  status         String    @default("PENDING")
+  notes          String?
+  farmId         Int       @default(1)
+  batch          Livestock @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  farm           Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([farmId])
+  @@map("medication_schedules")
+}
+
+model FarmSettings {
+  id                     Int      @id @default(autoincrement())
+  farmId                 Int      @unique
+  eggRecordReminderTime  String?  @default("18:00")
+  feedRecordReminderTime String?  @default("18:00")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  currency               String   @default("GHS")
+  growthTargetStandard   Int?     @map("growth_target_standard")
+  eggsPerCrate           Int      @default(30)
+  farm                   Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@map("farm_settings")
+}
+
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  tableName     String   @map("table_name")
+  recordId      Int      @map("record_id")
+  attributeName String   @map("attribute_name")
+  oldValue      String?  @map("old_value")
+  newValue      String?  @map("new_value")
+  reason        String?
+  userId        String   @map("user_id")
+  farmId        Int      @map("farm_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([farmId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Expense {
+  id          Int             @id @default(autoincrement())
+  farmId      Int
+  userId      String          @map("user_id")
+  amount      Decimal         @db.Decimal(15, 2)
+  category    ExpenseCategory
+  description String?
+  expenseDate DateTime        @default(now()) @map("expense_date")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  batch_id    Int?
+  batches     Livestock?      @relation(fields: [batch_id], references: [id])
+  farm        Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  supplierId  Int?
+  supplier    Supplier?       @relation(fields: [supplierId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@index([expenseDate, category])
+  @@index([farmId])
+  @@index([userId])
+  @@index([batch_id])
+  @@map("expenses")
+}
+
+model UserPermission {
+  id               Int     @id @default(autoincrement())
+  userId           String  @map("user_id")
+  farmId           Int     @map("farm_id")
+  canViewFinance   Boolean @default(false) @map("can_view_finance")
+  canEditFinance   Boolean @default(false) @map("can_edit_finance")
+  canViewInventory Boolean @default(false) @map("can_view_inventory")
+  canEditInventory Boolean @default(false) @map("can_edit_inventory")
+  canViewBatches     Boolean @default(false) @map("can_view_batches")
+  canEditBatches     Boolean @default(false) @map("can_edit_batches")
+  canViewSales       Boolean @default(false) @map("can_view_sales")
+  canEditSales       Boolean @default(false) @map("can_edit_sales")
+  canViewEggs        Boolean @default(false) @map("can_view_eggs")
+  canEditEggs        Boolean @default(false) @map("can_edit_eggs")
+  canViewFeeding     Boolean @default(false) @map("can_view_feeding")
+  canEditFeeding     Boolean @default(false) @map("can_edit_feeding")
+  canViewHouses      Boolean @default(false) @map("can_view_houses")
+  canEditHouses      Boolean @default(false) @map("can_edit_houses")
+  canViewMortality   Boolean @default(false) @map("can_view_mortality")
+  canEditMortality   Boolean @default(false) @map("can_edit_mortality")
+  canViewCustomers   Boolean @default(false) @map("can_view_customers")
+  canEditCustomers   Boolean @default(false) @map("can_edit_customers")
+  canViewTeam        Boolean @default(false) @map("can_view_team")
+  canEditTeam        Boolean @default(false) @map("can_edit_team")
+  farm             Farm    @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, farmId])
+  @@index([farmId])
+  @@index([userId])
+  @@map("user_permissions")
+}
+
+model GrowthStandards {
+  id            Int           @id @default(autoincrement())
+  livestockType LivestockType
+  ageInDays     Int
+  targetWeight  Decimal       @db.Decimal(10, 3)
+  targetFeed    Decimal?      @db.Decimal(10, 3)
+  unit          String        @default("kg")
+  createdAt     DateTime      @default(now())
+
+  @@map("growth_standards")
+}
+
+model SubscriptionPlan {
+  id            Int              @id @default(autoincrement())
+  name          String
+  tier          SubscriptionTier
+  price         Decimal          @db.Decimal(15, 2)
+  currency      String           @default("USD")
+  interval      String           @default("monthly")
+  features      Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id        Int              @id @default(autoincrement())
+  farmId    Int              @unique
+  planId    Int
+  status    String           @default("ACTIVE")
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  farm      Farm             @relation(fields: [farmId], references: [id])
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Customer {
+  id          Int      @id @default(autoincrement())
+  farmId      Int
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  balanceOwed Decimal  @default(0) @db.Decimal(15, 2)
+  farm        Farm     @relation(fields: [farmId], references: [id])
+  orders      Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  farmId         Int
+  customerId     Int?
+  totalAmount    Decimal     @db.Decimal(15, 2)
+  currency       String      @default("USD")
+  status         String      @default("PENDING")
+  orderDate      DateTime    @default("2024-01-01T00:00:00.000Z") @map("order_date")
+  userId         String      @default("user_placeholder") @map("user_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  discountAmount Decimal     @default(0) @db.Decimal(15, 2)
+  items          OrderItem[]
+  customer       Customer?   @relation(fields: [customerId], references: [id])
+  farm           Farm        @relation(fields: [farmId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+
+  @@index([orderDate, status])
+  @@map("orders")
+}
+
+
+model OrderItem {
+  id          Int        @id @default(autoincrement())
+  orderId     Int
+  description String
+  quantity    Int
+  unitPrice   Decimal    @db.Decimal(15, 2)
+  totalPrice  Decimal    @db.Decimal(15, 2)
+  inventoryId Int?
+  livestockId Int?
+  inventory   Inventory? @relation(fields: [inventoryId], references: [id])
+  batch       Livestock? @relation(fields: [livestockId], references: [id])
+  order       Order      @relation(fields: [orderId], references: [id])
+
+  @@map("order_items")
+}
+
+model FeedFormulation {
+  id              Int                         @id @default(autoincrement())
+  farmId          Int
+  name            String
+  notes           String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  targetLivestock LivestockType?
+  type            FeedType
+  feedingLogs     FeedingLog[]
+  ingredients     FeedFormulationIngredient[]
+  farm            Farm                        @relation(fields: [farmId], references: [id])
+
+  @@map("feed_formulations")
+}
+
+model FeedFormulationIngredient {
+  id            Int             @id @default(autoincrement())
+  formulationId Int
+  inventoryId   Int
+  quantity      Decimal?        @db.Decimal(10, 3)
+  unit          String?         @default("kg")
+  percentage    Decimal?        @db.Decimal(5, 2)
+  formulation   FeedFormulation @relation(fields: [formulationId], references: [id], onDelete: Cascade)
+  inventory     Inventory       @relation(fields: [inventoryId], references: [id])
+
+  @@map("feed_formulation_ingredients")
+}
+
+enum LivestockType {
+  POULTRY_BROILER
+  POULTRY_LAYER
+  CATTLE
+  SHEEP_GOAT
+  PIG
+  OTHER
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  WORKER
+  ACCOUNTANT
+  FINANCE_OFFICER
+  CASHIER
+}
+
+enum ExpenseCategory {
+  FEED
+  MEDICATION
+  EQUIPMENT
+  UTILITIES
+  SALARY
+  MAINTENANCE
+  OTHER
+  LIVESTOCK_PURCHASE
+  TRANSPORT
+}
+
+enum SubscriptionTier {
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
+enum FeedType {
+  PRE_STARTER
+  STARTER
+  GROWER
+  FINISHER
+  BREEDER
+  CUSTOM
+}
+
+model Supplier {
+  id          Int         @id @default(autoincrement())
+  farmId      Int
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  balanceOwed Decimal     @default(0) @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  farm        Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  inventory   Inventory[]
+
+  @@map("suppliers")
+}
+
+model EggCategory {
+  id             Int             @id @default(autoincrement())
+  farmId         Int
+  name           String
+  description    String?
+  createdAt      DateTime        @default(now())
+  farm           Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  eggProductions EggProduction[]
+  inventoryItems Inventory[]
+
+  @@unique([farmId, name])
+  @@map("egg_categories")
+}
