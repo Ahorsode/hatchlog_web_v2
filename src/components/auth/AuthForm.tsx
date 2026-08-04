@@ -10,6 +10,7 @@ import LoadingOverlay from "./LoadingOverlay";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
+import { getAuthCallbackUrl } from "@/lib/site-url";
 
 interface AuthFormProps {
   mode: "login" | "signup";
@@ -59,7 +60,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     );
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+      options: { redirectTo: getAuthCallbackUrl('/dashboard') },
     });
   };
 

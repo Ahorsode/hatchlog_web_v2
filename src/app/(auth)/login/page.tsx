@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Phone, ArrowRight, Loader2, Plus, Lock, ShieldAlert } from 'lucide-react';
 import Background3D from '@/components/auth/Background3D';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { getAuthCallbackUrl } from '@/lib/site-url';
 
 const SECURITY_NOTICE = 'Your security permissions have been updated. Please sign in again to activate your new features.';
 
@@ -77,10 +78,9 @@ export default function LoginPage() {
     setError('');
     try {
       const supabase = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/api/auth/callback?next=/dashboard`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: { redirectTo: getAuthCallbackUrl('/dashboard') },
       });
       if (oauthError) {
         setError(oauthError.message || 'Google sign-in failed.');
