@@ -44,14 +44,17 @@ export default async function DashboardLayout({
 
   if (!farm || isPlaceholder) {
     if (!farm) {
-      let inviteCheck: { success?: boolean } | null = null;
+      let inviteCheck: { success?: boolean; membership?: unknown } | null =
+        null;
       try {
         inviteCheck = await acceptInvitation(false);
       } catch (error) {
         console.error('[DashboardLayout] Invitation check failed:', error);
       }
 
-      if (inviteCheck?.success) {
+      // Only reload when a membership was actually created — a bare
+      // success:true stub previously caused ERR_TOO_MANY_REDIRECTS.
+      if (inviteCheck?.success && inviteCheck.membership) {
         redirect('/dashboard');
       }
     }

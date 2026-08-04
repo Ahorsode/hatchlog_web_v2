@@ -15,6 +15,7 @@ import {
   getTeamMemberPermissions,
   updateTeamMemberPermissions,
   listTeamMembers,
+  acceptTeamInvitationApi,
 } from '@/lib/hatchlog-api'
 
 type StaffRole = 'OWNER' | 'MANAGER' | 'WORKER' | 'ACCOUNTANT' | 'FINANCE_OFFICER' | 'CASHIER'
@@ -46,9 +47,32 @@ export async function inviteWorker(data: {
   }
 }
 
-// Handled by Nest team module on login
-export async function acceptInvitation(_shouldRevalidate = true) {
-  return { success: true, membership: null }
+/**
+ * Accept pending team invitations for the signed-in user.
+ * Nest /api/v1/team/invitations/accept is not fully wired yet — must NOT
+ * report success without a membership, or dashboard layout self-redirects forever.
+ */
+export async function acceptInvitation(shouldRevalidate = true) {
+  try {
+    const result = (await acceptTeamInvitationApi({})) as {
+      membership?: unknown
+      accepted?: boolean
+    } | null
+
+    const membership = result?.membership ?? null
+    if (!membership) {
+      return { success: false, membership: null }
+    }
+
+    if (shouldRevalidate) {
+      revalidatePath('/dashboard')
+    }
+    return { success: true, membership }
+  } catch (error) {
+    // No pending invite / endpoint missing — treat as no-op, not success.
+    console.error('[acceptInvitation]', error)
+    return { success: false, membership: null }
+  }
 }
 
 export async function getFarmMembers() {

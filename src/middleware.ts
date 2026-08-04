@@ -45,11 +45,12 @@ export default async function middleware(
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  if (
-    isLoggedIn &&
-    isAuthPage &&
-    !request.nextUrl.searchParams.has('error')
-  ) {
+  // Skip bounce when login shows an error/reason (avoids /login ↔ /dashboard loops).
+  const hasAuthError =
+    request.nextUrl.searchParams.has('error') ||
+    request.nextUrl.searchParams.has('reason')
+
+  if (isLoggedIn && isAuthPage && !hasAuthError) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

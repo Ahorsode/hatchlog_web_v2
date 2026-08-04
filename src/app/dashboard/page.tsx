@@ -18,10 +18,11 @@ export default async function DashboardPage() {
   } catch (err: any) {
     const message = err?.message ?? '';
     if (message.startsWith('SESSION_REVOKED:')) {
-      redirect('/login?reason=session_revoked');
+      // Clear cookies via force-login so middleware does not bounce back.
+      redirect('/api/auth/force-login?error=session_revoked');
     }
 
-    redirect('/login');
+    redirect('/api/auth/force-login?error=auth');
   }
 
   if (!activeFarmId) {
