@@ -38,13 +38,28 @@ export default async function DashboardPage() {
 
   try {
     const [stats, housesRaw, summary, me, farm, farmSettings] = await Promise.all([
-      getDashboardStats(),
+      getDashboardStats().catch((err) => {
+        console.error('[DashboardPage] stats failed:', err);
+        return null;
+      }),
       listHouses(activeFarmId).catch(() => []),
       getMonthlyProductionSummary(),
       hatchlogMe().catch(() => null),
       getFarm(activeFarmId).catch(() => null) as Promise<any>,
       getFarmSettings(activeFarmId).catch(() => null) as Promise<any>,
     ]);
+
+    if (!stats) {
+      return (
+        <div className="p-7 text-center bg-amber-50 rounded-lg border border-amber-200">
+          <h2 className="text-xl font-bold text-amber-800 mb-2">Dashboard data unavailable</h2>
+          <p className="text-amber-700">
+            Your farm is set up, but KPI stats could not be loaded from the API. Refresh in a moment.
+            If this continues, check Nest farm permissions / auth guard order.
+          </p>
+        </div>
+      );
+    }
 
     const role = me?.isFarmOwner ? 'OWNER' : me?.role || 'WORKER';
     const currency = farmSettings?.currency || 'GHS';
@@ -71,12 +86,12 @@ export default async function DashboardPage() {
       </PullToRefresh>
     );
   } catch (error) {
+    console.error('[DashboardPage] unexpected error:', error);
     return (
       <div className="p-7 text-center bg-red-50 rounded-lg border border-red-200">
-        <h2 className="text-xl font-bold text-red-800 mb-2">Database Connection Error</h2>
+        <h2 className="text-xl font-bold text-red-800 mb-2">Dashboard Error</h2>
         <p className="text-red-600">
-          The dashboard is currently unavailable due to an issue connecting to the database or retrieving data. 
-          Please check your connection and ensure the database schema is up-to-date.
+          The dashboard could not load farm data. Please refresh and try again.
         </p>
       </div>
     );
