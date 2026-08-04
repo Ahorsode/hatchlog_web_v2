@@ -526,7 +526,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                      </div>
                      
                      <Link 
-                       href={`/dashboard/flocks/${batch.numericId}`}
+                       href={`/dashboard/flocks/${batch.id}`}
                        className="flex items-center justify-center gap-2 w-full py-3 rounded-md bg-white/10 border border-white/10 text-white font-bold text-sm transition-all"
                      >
                         <Eye className="w-4 h-4" />

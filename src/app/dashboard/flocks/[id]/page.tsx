@@ -10,12 +10,20 @@ import { getFarmSettings } from '@/lib/actions/preference-actions';
 
 export default async function FlockDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [data, farmSettings] = await Promise.all([
-    getFlockDeepDive(id),
-    getFarmSettings(),
-  ]);
+  let data: any = null;
+  let farmSettings: any = null;
 
-  if (!data) {
+  try {
+    ;[data, farmSettings] = await Promise.all([
+      getFlockDeepDive(id),
+      getFarmSettings(),
+    ]);
+  } catch (error) {
+    console.error('[FlockDetailPage] failed to load:', error);
+    notFound();
+  }
+
+  if (!data?.batch?.id) {
     notFound();
   }
 
