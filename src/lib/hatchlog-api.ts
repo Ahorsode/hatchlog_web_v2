@@ -67,6 +67,13 @@ async function resolveAuthHeaders(userId?: string): Promise<HeadersInit> {
   )
 }
 
+function publicJsonHeaders(): HeadersInit {
+  return {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+}
+
 async function requestJson<T>(
   path: string,
   options: {
@@ -74,6 +81,12 @@ async function requestJson<T>(
     userId?: string
     body?: unknown
     query?: Record<string, string>
+    /**
+     * `required` (default): Bearer or internal API key.
+     * `optional`: Bearer if present, otherwise unauthenticated (Nest @Public routes).
+     * `none`: never send auth (Nest @Public routes like profile bootstrap).
+     */
+    auth?: 'required' | 'optional' | 'none'
   },
 ): Promise<T> {
   const url = new URL(`${apiBaseUrl()}${path}`)
@@ -83,9 +96,23 @@ async function requestJson<T>(
     }
   }
 
+  const authMode = options.auth ?? 'required'
+  let headers: HeadersInit
+  if (authMode === 'none') {
+    headers = publicJsonHeaders()
+  } else if (authMode === 'optional') {
+    try {
+      headers = await resolveAuthHeaders(options.userId)
+    } catch {
+      headers = publicJsonHeaders()
+    }
+  } else {
+    headers = await resolveAuthHeaders(options.userId)
+  }
+
   const response = await fetch(url, {
     method: options.method || 'GET',
-    headers: await resolveAuthHeaders(options.userId),
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
   })
@@ -178,7 +205,12 @@ export async function hatchlogProfileByIdentity(email?: string, phone?: string) 
     surname: string | null
     role: string
     sessionVersion: number
-  } | null>('/api/v1/profiles/by-identity', { method: 'GET', query })
+  } | null>('/api/v1/profiles/by-identity', {
+    method: 'GET',
+    query,
+    // Nest marks this @Public — must work during signup/OAuth before a session exists.
+    auth: 'none',
+  })
 }
 
 export async function hatchlogBootstrapProfile(body: {
@@ -190,7 +222,12 @@ export async function hatchlogBootstrapProfile(body: {
 }) {
   return requestJson<{ userId: string; farmId: string; created: boolean }>(
     '/api/v1/profiles',
-    { method: 'POST', body },
+    {
+      method: 'POST',
+      body,
+      // Nest marks this @Public — Google OAuth + phone signup bootstrap here.
+      auth: 'none',
+    },
   )
 }
 
