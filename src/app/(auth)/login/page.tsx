@@ -24,6 +24,14 @@ export default function LoginPage() {
     const authError = searchParams.get('error');
     if (authError === 'oauth' || authError === 'OAuthAccountNotLinked') {
       setError('Google sign-in failed. Please try again or contact your farm administrator.');
+    } else if (authError === 'db') {
+      setError(
+        'Signed in with Google, but the farm API rejected the session. Check Nest SUPABASE_JWT_SECRET and HATCHLOG_API_URL, then try again.',
+      );
+    } else if (authError === 'user_not_found') {
+      setError(
+        'Google account signed in, but no HatchLog profile was found. Try again, or contact support if this persists.',
+      );
     } else if (authError) {
       setError('Sign-in failed. Please try again.');
     }

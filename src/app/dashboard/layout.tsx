@@ -16,7 +16,8 @@ export default async function DashboardLayout({
   const sessionUser = await getAppSessionUser();
   
   if (!sessionUser?.id) {
-    redirect('/login');
+    // Clear orphan Supabase cookies so middleware does not loop /login ↔ /dashboard.
+    redirect('/api/auth/force-login?error=user_not_found');
   }
 
   if (sessionUser.mustChangePassword) {
@@ -32,11 +33,11 @@ export default async function DashboardLayout({
     farm = Array.isArray(farms) && farms.length > 0 ? farms[0] : null;
   } catch (error) {
     console.error('[DashboardLayout] API error:', error);
-    redirect('/login?error=db');
+    redirect('/api/auth/force-login?error=db');
   }
 
   if (!me) {
-    redirect('/login?error=user_not_found');
+    redirect('/api/auth/force-login?error=user_not_found');
   }
 
   const isPlaceholder = farm && farm.capacity === 0 && farm.location === '';

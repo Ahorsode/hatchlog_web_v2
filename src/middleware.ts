@@ -38,7 +38,18 @@ export default async function middleware(
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isLoggedIn && (isAuthPage || pathname === '/')) {
+  // Only bounce the marketing root when already signed in.
+  // Do NOT auto-redirect /login|/signup → /dashboard: Nest /me can fail while a
+  // Supabase cookie remains, which previously caused ERR_TOO_MANY_REDIRECTS.
+  if (isLoggedIn && pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (
+    isLoggedIn &&
+    isAuthPage &&
+    !request.nextUrl.searchParams.has('error')
+  ) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
