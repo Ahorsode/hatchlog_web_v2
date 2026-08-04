@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, Suspense } from 'react';
 import { HealthBadge } from '@/components/ui/HealthBadge';
@@ -133,6 +133,28 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const epc = eggsPerCrate > 0 ? eggsPerCrate : 30;
 
+  // Nest KPI payload and legacy UI shapes can diverge — never crash on .map/.length.
+  const safeStats = {
+    totalBirds: Number(stats?.totalBirds ?? 0),
+    mortalityRate: String(stats?.mortalityRate ?? 0),
+    overallDead: Number(stats?.overallDead ?? 0),
+    todayDead: Number(stats?.todayDead ?? 0),
+    totalEggs: Number(stats?.totalEggs ?? 0),
+    todayEggs: Number(stats?.todayEggs ?? 0),
+    lowFeedAlertsCount: Number(stats?.lowFeedAlertsCount ?? 0),
+    lowFeedItems: Array.isArray(stats?.lowFeedItems) ? stats.lowFeedItems : [],
+    eggTrendData: Array.isArray(stats?.eggTrendData) ? stats.eggTrendData : [],
+    feedTrendData: Array.isArray(stats?.feedTrendData) ? stats.feedTrendData : [],
+    revenueTrendData: Array.isArray(stats?.revenueTrendData) ? stats.revenueTrendData : [],
+    mortalityTrendData: Array.isArray(stats?.mortalityTrendData) ? stats.mortalityTrendData : [],
+    alerts: Array.isArray(stats?.alerts) ? stats.alerts : [],
+    activeBatches: Array.isArray(stats?.activeBatches) ? stats.activeBatches : [],
+    productivityIndex: stats?.productivityIndex,
+    executiveStats: stats?.executiveStats,
+    strategicPriorities: Array.isArray(stats?.strategicPriorities) ? stats.strategicPriorities : [],
+    revenueVelocityData: Array.isArray(stats?.revenueVelocityData) ? stats.revenueVelocityData : [],
+  };
+
   const getGrowthProgress = (hatchDate: string, breed: string) => {
     const daysDiff = getAgeInDays(hatchDate);
     const target = normalizeBreedValue(breed) === 'ross_308' ? 42 : 700;
@@ -141,19 +163,19 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
   };
 
   if (role === 'ACCOUNTANT' || role === 'FINANCE_OFFICER') {
-    return <AccountantDashboard summary={summary} stats={stats} currency={currency} />;
+    return <AccountantDashboard summary={summary} stats={safeStats} currency={currency} />;
   }
 
   if (role === 'WORKER' || role === 'CASHIER') {
-    return <WorkerDashboard stats={stats} houses={houses} permissions={permissions} />;
+    return <WorkerDashboard stats={safeStats} houses={houses} permissions={permissions} />;
   }
 
   if (role === 'OWNER' && subscriptionTier === 'PREMIUM') {
     return (
       <ExecutiveDashboard
-        stats={stats.executiveStats!}
-        strategicPriorities={stats.strategicPriorities}
-        revenueVelocityData={stats.revenueVelocityData}
+        stats={safeStats.executiveStats!}
+        strategicPriorities={safeStats.strategicPriorities}
+        revenueVelocityData={safeStats.revenueVelocityData}
         currency={currency}
       />
     );
@@ -196,7 +218,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
          <div>
             <h1 className="text-4xl font-bold text-white tracking-normal">Farm <span className="text-emerald-400 italic">Overview</span></h1>
             <p className="text-white/70 font-bold uppercase tracking-widest text-xs mt-2 flex items-center gap-2 mb-2">
-               <Activity className="w-3 h-3" /> Live Operations Tracking • {stats.activeBatches.length} Units Active
+               <Activity className="w-3 h-3" /> Live Operations Tracking • {safeStats.activeBatches.length} Units Active
             </p>
          </div>
          <div className="flex items-center gap-3">
@@ -210,7 +232,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
          </div>
       </header>
 
-      {stats.activeBatches.length === 0 ? (
+      {safeStats.activeBatches.length === 0 ? (
         renderZeroState()
       ) : (
         <>
@@ -225,7 +247,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                 </CardHeader>
                 <CardContent className="flex flex-col h-full relative z-10 pt-3 pb-5">
                   <div className="mt-2 min-w-0">
-                     <p className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-normal break-all">{(stats?.totalBirds || 0).toLocaleString()}</p>
+                     <p className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-normal break-all">{(safeStats?.totalBirds || 0).toLocaleString()}</p>
                      <div className="text-emerald-400 font-bold text-sm md:text-xl mt-1 italic break-words">Active Livestock</div>
                   </div>
                   
@@ -243,20 +265,20 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                              <Skull className="w-4 h-4 text-red-400" />
                              <span className="text-red-400 font-bold text-sm">Mortality Rate</span>
                            </div>
-                           <span className="text-white font-bold text-xl">{stats.mortalityRate}%</span>
+                           <span className="text-white font-bold text-xl">{safeStats.mortalityRate}%</span>
                         </div>
                          <div className="grid grid-cols-2 gap-3 mt-2 bg-black/60 p-2 rounded-md">
                             <div>
                                <p className="text-xs text-white/70 uppercase font-bold tracking-widest italic mb-1">Today Dead</p>
-                               <p className="text-white font-bold text-2xl tracking-normal">{stats.todayDead}</p>
+                               <p className="text-white font-bold text-2xl tracking-normal">{safeStats.todayDead}</p>
                             </div>
                             <div>
                                <p className="text-xs text-white/70 uppercase font-bold tracking-widest italic mb-1">Overall Dead</p>
-                               <p className="text-white font-bold text-2xl tracking-normal">{stats.overallDead}</p>
+                               <p className="text-white font-bold text-2xl tracking-normal">{safeStats.overallDead}</p>
                             </div>
                          </div>
                          <div className="mt-3 pt-3 border-t border-white/5">
-                            <MiniBarChart data={stats.mortalityTrendData.map((d: { count: number }) => d.count)} color="bg-red-400" />
+                            <MiniBarChart data={safeStats.mortalityTrendData.map((d: { count: number }) => d.count)} color="bg-red-400" />
                             <p className="text-[8px] text-center text-red-400/50 uppercase tracking-widest mt-2 font-bold">7 Day Mortality Trend</p>
                          </div>
                       </div>
@@ -281,26 +303,26 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                    <div className="flex justify-between items-end border-b border-white/5 pb-3 mb-2 gap-2">
                       <div className="min-w-0">
                         <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-normal break-all">
-                          {Math.floor((stats?.todayEggs || 0) / epc)}
+                          {Math.floor((safeStats?.todayEggs || 0) / epc)}
                           <span className="text-base font-bold text-white/60 ml-1">crates</span>
                         </p>
-                        {(stats?.todayEggs || 0) % epc > 0 && (
-                          <p className="text-xs text-blue-300 font-semibold mt-0.5">+ {(stats?.todayEggs || 0) % epc} eggs</p>
+                        {(safeStats?.todayEggs || 0) % epc > 0 && (
+                          <p className="text-xs text-blue-300 font-semibold mt-0.5">+ {(safeStats?.todayEggs || 0) % epc} eggs</p>
                         )}
                         <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic break-words">Collected today</p>
                       </div>
                       <div className="text-right min-w-0">
                         <p className="text-xl sm:text-2xl md:text-2xl font-bold text-white tracking-normal break-all">
-                          {Math.floor((stats?.totalEggs || 0) / epc)}
+                          {Math.floor((safeStats?.totalEggs || 0) / epc)}
                           <span className="text-sm font-bold text-white/60 ml-1">crates</span>
                         </p>
-                        {(stats?.totalEggs || 0) % epc > 0 && (
-                          <p className="text-xs text-blue-300 font-semibold mt-0.5">+ {(stats?.totalEggs || 0) % epc} eggs</p>
+                        {(safeStats?.totalEggs || 0) % epc > 0 && (
+                          <p className="text-xs text-blue-300 font-semibold mt-0.5">+ {(safeStats?.totalEggs || 0) % epc} eggs</p>
                         )}
                         <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1 italic break-words">Total Stock</p>
                       </div>
                    </div>
-                  <MiniBarChart data={stats.eggTrendData.map((d: { count: number }) => d.count)} color="bg-blue-400" />
+                  <MiniBarChart data={safeStats.eggTrendData.map((d: { count: number }) => d.count)} color="bg-blue-400" />
                   <p className="text-[8px] text-center text-white/70 uppercase tracking-widest mt-2">7 Day Trend</p>
                 </CardContent>
               </Card>
@@ -322,9 +344,9 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                  <CardContent className="pt-2">
                      <div className="flex items-baseline gap-2 min-w-0">
                         <span className="text-3xl md:text-5xl font-bold text-white tracking-normal truncate">
-                          {stats.activeBatches.length > 0
-                            ? (stats.activeBatches.reduce((acc: number, batch: any) => acc + getGrowthProgress(batch.hatchDate, batch.breed).percent, 0) / stats.activeBatches.length).toFixed(1)
-                            : (stats.productivityIndex ?? 0)}%
+                          {safeStats.activeBatches.length > 0
+                            ? (safeStats.activeBatches.reduce((acc: number, batch: any) => acc + getGrowthProgress(batch.hatchDate, batch.breed).percent, 0) / safeStats.activeBatches.length).toFixed(1)
+                            : (safeStats.productivityIndex ?? 0)}%
                         </span>
                         <span className="text-[10px] font-bold uppercase text-purple-400 tracking-widest italic shrink-0">Efficiency</span>
                      </div>
@@ -332,7 +354,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                     <div className="h-2 w-full bg-white/10 rounded-full mt-2 overflow-hidden border border-white/5">
                        <motion.div 
                          initial={{ width: 0 }}
-                         animate={{ width: `${stats.activeBatches.length > 0 ? (stats.activeBatches.reduce((acc: number, batch: any) => acc + getGrowthProgress(batch.hatchDate, batch.breed).percent, 0) / stats.activeBatches.length) : (stats.productivityIndex ?? 0)}%` }}
+                         animate={{ width: `${safeStats.activeBatches.length > 0 ? (safeStats.activeBatches.reduce((acc: number, batch: any) => acc + getGrowthProgress(batch.hatchDate, batch.breed).percent, 0) / safeStats.activeBatches.length) : (safeStats.productivityIndex ?? 0)}%` }}
                          transition={{ duration: 1.5, delay: 0.5 }}
                          className="h-full bg-gradient-to-r from-purple-600 to-purple-400"
                        />
@@ -358,7 +380,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                  </CardHeader>
                  <CardContent className="pt-2">
                    {(() => {
-                     const raw = stats.totalEggs || 0;
+                     const raw = safeStats.totalEggs || 0;
                      const crates = Math.floor(raw / epc);
                      const rem = raw % epc;
                      return (
@@ -386,7 +408,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                 <Activity className="w-5 h-5 text-amber-400/50 flex-shrink-0" />
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto custom-scrollbar space-y-2 mt-2 pr-2">
-                {stats.alerts.map((alert: any, idx: number) => {
+                {safeStats.alerts.map((alert: any, idx: number) => {
                   const Icon = alert.type === 'VACCINE' ? Syringe : 
                                alert.type === 'MEDICATION' ? Activity : 
                                alert.type === 'EGGS' ? Package :
@@ -411,7 +433,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                   );
                 })}
 
-                {stats.lowFeedItems.map((item: any, idx: number) => (
+                {safeStats.lowFeedItems.map((item: any, idx: number) => (
                    <div key={`feed-${idx}`} className="flex items-center gap-2 bg-red-500/15 p-2 rounded-md border border-red-500/20">
                       <Wheat className="w-5 h-5 text-red-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -421,7 +443,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                    </div>
                 ))}
                 
-                {stats.alerts.length === 0 && stats.lowFeedItems.length === 0 && (
+                {safeStats.alerts.length === 0 && safeStats.lowFeedItems.length === 0 && (
                   <div className="text-center py-7">
                      <p className="text-white/70 text-xs italic font-bold">No urgent alerts.</p>
                   </div>
@@ -438,12 +460,12 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
               <CardContent className="flex-1 flex flex-col justify-between pt-2 relative z-10">
                   <div>
                     <p className="text-4xl font-bold text-white tracking-normal">
-                      {(stats.feedTrendData?.reduce((sum: number, d: { count: number }) => sum + (d.count || 0), 0) || 0).toLocaleString()} <span className="text-lg">bags</span>
+                      {(safeStats.feedTrendData?.reduce((sum: number, d: { count: number }) => sum + (d.count || 0), 0) || 0).toLocaleString()} <span className="text-lg">bags</span>
                     </p>
                     <p className="text-xs text-white/70 font-bold uppercase tracking-widest mt-1 italic">Weekly Consumption</p>
                  </div>
                  <div>
-                   <MiniBarChart data={stats.feedTrendData.map((d: { count: number }) => d.count)} color="bg-emerald-400" />
+                   <MiniBarChart data={safeStats.feedTrendData.map((d: { count: number }) => d.count)} color="bg-emerald-400" />
                    <p className="text-[8px] text-center text-white/70 uppercase tracking-widest mt-2">Daily Breakdown (Last 7 Days)</p>
                  </div>
               </CardContent>
@@ -458,7 +480,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent mx-5" />
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-               {stats.activeBatches.map((batch: any, index: number) => {
+               {safeStats.activeBatches.map((batch: any, index: number) => {
                  const progress = getGrowthProgress(batch.hatchDate, batch.breed);
                  const unit = getUnitBySpecies(batch.type);
                  const formattedAge = formatAge(batch.hatchDate, batch.type);

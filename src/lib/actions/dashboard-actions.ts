@@ -39,7 +39,78 @@ export async function getDashboardStats(): Promise<any> {
   if (!activeFarmId) throw new Error('No active farm selected')
 
   try {
-    return await getDashboardStatsApi(activeFarmId) as any
+    const [raw, livestockRaw, inventoryRaw] = await Promise.all([
+      getDashboardStatsApi(activeFarmId) as Promise<any>,
+      listLivestock(activeFarmId, { status: 'active', limit: 100 }).catch(() => []),
+      listInventory(activeFarmId, { filter: 'low', limit: 50 }).catch(() => []),
+    ])
+
+    const seriesEggs = Array.isArray(raw?.series?.eggs) ? raw.series.eggs : []
+    const seriesFeed = Array.isArray(raw?.series?.feed) ? raw.series.feed : []
+    const seriesMortality = Array.isArray(raw?.series?.mortality)
+      ? raw.series.mortality
+      : []
+
+    const toTrend = (rows: Array<{ date?: string; value?: number }>) =>
+      rows.map((row) => ({
+        date: String(row.date || ''),
+        count: Number(row.value || 0),
+      }))
+
+    const livestock = Array.isArray(livestockRaw) ? livestockRaw : []
+    const activeBatches = livestock.map((batch: any, index: number) => ({
+      id: batch.id,
+      batchName: batch.batchName ?? batch.name ?? null,
+      breed: batch.breed || 'unknown',
+      quantity: Number(batch.currentCount ?? batch.quantity ?? 0),
+      hatchDate: batch.hatchDate || batch.startDate || new Date().toISOString(),
+      status: batch.status || 'active',
+      houseNumber: batch.house?.name || batch.houseNumber || '',
+      numericId: batch.numericId ?? batch.legacyId ?? index + 1,
+      type: batch.type || batch.livestockType || 'LAYER',
+    }))
+
+    const inventory = Array.isArray(inventoryRaw) ? inventoryRaw : []
+    const lowFeedItems = inventory
+      .filter((item: any) => {
+        const category = String(item.category || item.type || '').toLowerCase()
+        const isFeed = category.includes('feed') || category.includes('mash')
+        const stock = Number(item.stockLevel ?? item.quantity ?? item.currentStock ?? 0)
+        const threshold = Number(item.lowStockThreshold ?? item.minStock ?? 5)
+        return isFeed && stock <= threshold
+      })
+      .map((item: any) => ({
+        name: item.name || item.itemName || 'Feed',
+        stockLevel: Number(item.stockLevel ?? item.quantity ?? item.currentStock ?? 0),
+        category: String(item.category || 'FEED'),
+      }))
+
+    return {
+      totalBirds: Number(raw?.totalBirdCount ?? raw?.totalBirds ?? 0),
+      mortalityRate: String(raw?.mortalityRate ?? 0),
+      overallDead: Number(raw?.totalDead ?? raw?.overallDead ?? 0),
+      todayDead: Number(raw?.todayDead ?? 0),
+      totalEggs: Number(raw?.totalEggs ?? 0),
+      todayEggs: Number(raw?.todayEggs ?? 0),
+      lowFeedAlertsCount: lowFeedItems.length,
+      lowFeedItems,
+      eggTrendData: toTrend(seriesEggs),
+      feedTrendData: toTrend(seriesFeed),
+      revenueTrendData: Array.isArray(raw?.revenueTrendData) ? raw.revenueTrendData : [],
+      mortalityTrendData: toTrend(seriesMortality),
+      alerts: Array.isArray(raw?.alerts) ? raw.alerts : [],
+      activeBatches,
+      productivityIndex: Number(raw?.productivityIndex ?? 0),
+      executiveStats: raw?.executiveStats,
+      strategicPriorities: Array.isArray(raw?.strategicPriorities)
+        ? raw.strategicPriorities
+        : [],
+      revenueVelocityData: Array.isArray(raw?.revenueVelocityData)
+        ? raw.revenueVelocityData
+        : [],
+      supplierDebt: Number(raw?.supplierDebt ?? 0),
+      customerDebt: Number(raw?.customerDebt ?? 0),
+    }
   } catch (error: any) {
     console.error('Error fetching dashboard stats:', error)
     throw new Error('Failed to fetch dashboard stats')
