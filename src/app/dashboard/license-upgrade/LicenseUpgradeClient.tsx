@@ -113,7 +113,9 @@ function formatRemaining(expiry: Date | null, now: Date) {
   return `${days} days · ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} remaining`;
 }
 
-function getPlanLabel(tier: SubscriptionTier) {
+function getPlanLabel(tier: SubscriptionTier, accessStatus: "trial" | "paid" | "locked") {
+  if (accessStatus === "trial") return "30-DAY TRIAL";
+  if (accessStatus === "locked") return "TRIAL ENDED";
   if (tier === "STANDARD") return "STANDARD PRO";
   if (tier === "PREMIUM") return "ENTERPRISE SUITE";
   return "BASIC FREE";
@@ -178,34 +180,46 @@ export default function LicenseUpgradeClient({
 
   const standardPricing = getTermPricing(selectedMonths, 350);
   const enterprisePricing = getTermPricing(selectedMonths, 950);
+  const planBadgeLabel = getPlanLabel(currentTier, accessStatus);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-0 md:px-3 pt-2 pb-7 md:py-10">
       <section className="rounded-lg border border-white/10 bg-[#0f1115]/80 p-6 shadow-2xl shadow-black/25 backdrop-blur-2xl">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300/80">Your Current Plan</p>
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300/80">
+          {accessStatus === "trial" ? "Your Farm Trial" : "Your Current Plan"}
+        </p>
         <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <span className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-sm font-black tracking-[0.18em] text-emerald-100">
-              {getPlanLabel(currentTier)}
+            <span
+              className={cn(
+                "inline-flex rounded-full border px-4 py-2 text-sm font-black tracking-[0.18em]",
+                accessStatus === "trial"
+                  ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
+                  : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
+              )}
+            >
+              {planBadgeLabel}
             </span>
             {accessStatus === "locked" ? (
               <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
                 This farm trial has ended. Request a paid plan to restore access on web, desktop, and mobile.
-              </p>
-            ) : !statusLoaded ? (
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
-                Loading farm subscription status...
               </p>
             ) : accessStatus === "trial" ? (
               <div className={cn("mt-4 inline-flex items-center gap-3 rounded-lg border px-4 py-3 font-bold", getTimerTone(currentExpiry, now))}>
                 <Clock3 className="h-5 w-5" />
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] opacity-75">
-                    Shared farm trial · {liveRemainingDays} days left
+                    Standard trial · {liveRemainingDays} {liveRemainingDays === 1 ? "day" : "days"} left
                   </p>
-                  <p className="mt-1 text-lg">{formatRemaining(currentExpiry, now)}</p>
+                  <p className="mt-1 text-lg">
+                    {currentExpiry ? formatRemaining(currentExpiry, now) : `${liveRemainingDays} days remaining`}
+                  </p>
                 </div>
               </div>
+            ) : !statusLoaded ? (
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
+                Loading farm subscription status...
+              </p>
             ) : (
               <div className={cn("mt-4 inline-flex items-center gap-3 rounded-lg border px-4 py-3 font-bold", getTimerTone(currentExpiry, now))}>
                 <Clock3 className="h-5 w-5" />

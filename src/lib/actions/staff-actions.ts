@@ -29,7 +29,8 @@ function inviteIdentifierParts(value: string): { email?: string; phoneNumber?: s
   if (trimmed.includes('@')) {
     return { email: trimmed.toLowerCase() }
   }
-  return { phoneNumber: normalizePhoneNumber(trimmed) }
+  const phoneNumber = normalizePhoneNumber(trimmed)
+  return phoneNumber ? { phoneNumber } : {}
 }
 
 export async function inviteWorker(data: {

@@ -2,7 +2,7 @@
  * UI feature flags from Nest farm subscription status.
  * Nest API remains the authority for paid access; this only gates UI chrome.
  */
-import { getSubscriptionStatusApi, listTeamMembers } from './hatchlog-api'
+import { getFarm, getSubscriptionStatusApi, listTeamMembers } from './hatchlog-api'
 import {
   SUBSCRIPTION_TIER_FEATURES,
   type Feature,
@@ -18,6 +18,85 @@ export type FarmSubscriptionStatus = {
   entitlements: Feature[]
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const PAID_MASTER_STATUSES = new Set([
+  'PAID_STANDARD',
+  'PAID_PREMIUM',
+  'PAID_AND_ACTIVE',
+  'ACTIVE',
+  'PAID',
+])
+
+type FarmTrialRecord = {
+  subscriptionTier?: string | null
+  masterLicenseStatus?: string | null
+  trialStartedAt?: string | Date | null
+  trialExpiresAt?: string | Date | null
+}
+
+function parseDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function normalizeTier(tier: string | null | undefined): SubscriptionTier {
+  const value = (tier ?? 'BASIC').toUpperCase()
+  if (value === 'STANDARD' || value === 'PREMIUM') return value
+  return 'BASIC'
+}
+
+export function resolveFarmAccessFromRecord(
+  farm: FarmTrialRecord,
+  now = new Date(),
+): FarmSubscriptionStatus {
+  const master = (farm.masterLicenseStatus ?? '').toUpperCase()
+  const periodEndsAt = parseDate(farm.trialExpiresAt)
+  const trialStartedAt = parseDate(farm.trialStartedAt)
+  const remainingDays = periodEndsAt
+    ? Math.max(0, Math.ceil((periodEndsAt.getTime() - now.getTime()) / DAY_MS))
+    : 0
+
+  if (PAID_MASTER_STATUSES.has(master)) {
+    const tier = normalizeTier(farm.subscriptionTier)
+    return {
+      status: 'paid',
+      tier,
+      remainingDays,
+      periodEndsAt: periodEndsAt?.toISOString() ?? null,
+      trialStartedAt: trialStartedAt?.toISOString() ?? null,
+      entitlements: SUBSCRIPTION_TIER_FEATURES[tier],
+    }
+  }
+
+  const trialActive =
+    master !== 'REVOKED' &&
+    periodEndsAt != null &&
+    periodEndsAt.getTime() > now.getTime()
+
+  if (trialActive) {
+    return {
+      status: 'trial',
+      tier: 'STANDARD',
+      remainingDays,
+      periodEndsAt: periodEndsAt.toISOString(),
+      trialStartedAt: trialStartedAt?.toISOString() ?? null,
+      entitlements: SUBSCRIPTION_TIER_FEATURES.STANDARD,
+    }
+  }
+
+  const lockedTier = normalizeTier(farm.subscriptionTier)
+  return {
+    status: 'locked',
+    tier: lockedTier,
+    remainingDays: 0,
+    periodEndsAt: periodEndsAt?.toISOString() ?? null,
+    trialStartedAt: trialStartedAt?.toISOString() ?? null,
+    entitlements: [],
+  }
+}
+
 const WORKER_LIMITS: Record<SubscriptionTier, number> = {
   BASIC: 2,
   STANDARD: 5,
@@ -30,7 +109,12 @@ export async function getFarmSubscriptionStatus(
   try {
     return (await getSubscriptionStatusApi(farmId)) as FarmSubscriptionStatus
   } catch {
-    return null
+    try {
+      const farm = (await getFarm(farmId)) as FarmTrialRecord
+      return resolveFarmAccessFromRecord(farm)
+    } catch {
+      return null
+    }
   }
 }
 

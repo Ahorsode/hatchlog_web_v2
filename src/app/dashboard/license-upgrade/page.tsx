@@ -12,7 +12,7 @@ export default async function LicenseUpgradePage() {
     <LicenseUpgradeClient
       currentTier={status?.tier ?? 'STANDARD'}
       accessStatus={status?.status ?? 'trial'}
-      remainingDays={status?.remainingDays ?? 30}
+      remainingDays={status?.remainingDays ?? 0}
       periodEndsAt={status?.periodEndsAt ?? null}
       statusLoaded={Boolean(status)}
     />
