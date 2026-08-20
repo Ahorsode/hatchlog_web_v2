@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useMemo, useState, useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, Clock3, Crown, Monitor, Shield, Sparkles } from "lucide-react";
+import { Check, Clock3, Crown, Shield } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { requestSubscriptionUpgrade } from "@/lib/actions/subscription-actions";
-import { type DesktopLicenseRow } from "@/lib/actions/licenses";
 import { type SubscriptionTier } from '@/lib/enums';
 import { cn } from "@/lib/utils";
 
@@ -38,7 +37,7 @@ const plans: Plan[] = [
       "Advanced health analytics",
       "Full financial controls",
       "Inventory management",
-      "Team management for 3 workers",
+      "Team management for 5 workers",
       "Email and WhatsApp notifications",
     ],
     color: "from-emerald-500 to-teal-400",
@@ -55,6 +54,7 @@ const plans: Plan[] = [
       "Predictive analytics",
       "Custom financial reporting",
       "Multi-farm consolidation",
+      "Customer and supplier CRM",
       "Unlimited team members",
       "Priority concierge support",
     ],
@@ -89,38 +89,6 @@ function formatDate(value: string | null) {
     day: "numeric",
     year: "numeric",
   }).format(date);
-}
-
-function getMostRecentExpiry(devices: DesktopLicenseRow[]) {
-  const expiries = devices
-    .map((device) => (device.licenseExpiresAt ? new Date(device.licenseExpiresAt).getTime() : NaN))
-    .filter((time) => !Number.isNaN(time));
-
-  if (expiries.length === 0) return null;
-  return new Date(Math.max(...expiries));
-}
-
-function getDeviceAccessLabel(device: DesktopLicenseRow) {
-  const normalizedStatus = device.status.toUpperCase();
-  const expiresAt = device.licenseExpiresAt ? new Date(device.licenseExpiresAt) : null;
-  const expiryTime = expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt.getTime() : null;
-  const now = Date.now();
-
-  if (normalizedStatus === "EXPIRED" || (expiryTime !== null && expiryTime < now)) {
-    const daysAgo = expiryTime === null ? null : Math.max(0, Math.ceil((now - expiryTime) / DAY_MS));
-    return daysAgo === null ? "Expired" : daysAgo === 0 ? "Expired today" : `Expired ${daysAgo} days ago`;
-  }
-
-  if (normalizedStatus === "CLOUD_TRIAL" && expiryTime !== null) {
-    const daysLeft = Math.max(0, Math.ceil((expiryTime - now) / DAY_MS));
-    return `Trial ends in ${daysLeft} days`;
-  }
-
-  if (normalizedStatus === "ACTIVE" && expiryTime !== null) {
-    return `Active · ends ${formatDate(device.licenseExpiresAt)}`;
-  }
-
-  return device.status || "Pending";
 }
 
 function getTimerTone(expiry: Date | null, now: Date) {
@@ -165,16 +133,20 @@ function getTermPricing(months: number, monthlyPrice: number) {
 
 export default function LicenseUpgradeClient({
   currentTier,
-  devices,
+  accessStatus,
+  remainingDays,
+  periodEndsAt,
 }: {
   currentTier: SubscriptionTier;
-  devices: DesktopLicenseRow[];
+  accessStatus: "trial" | "paid" | "locked";
+  remainingDays: number;
+  periodEndsAt: string | null;
 }) {
   const router = useRouter();
   const [selectedMonths, setSelectedMonths] = useState(1);
   const [now, setNow] = useState(() => new Date());
   const [isUpgrading, startTransition] = useTransition();
-  const currentExpiry = useMemo(() => getMostRecentExpiry(devices), [devices]);
+  const currentExpiry = periodEndsAt ? new Date(periodEndsAt) : null;
 
   React.useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
@@ -210,43 +182,30 @@ export default function LicenseUpgradeClient({
             <span className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-sm font-black tracking-[0.18em] text-emerald-100">
               {getPlanLabel(currentTier)}
             </span>
-            {currentTier === "BASIC" ? (
+            {accessStatus === "locked" ? (
               <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
-                You are on the free plan. Upgrade to unlock advanced features.
+                This farm trial has ended. Request a paid plan to restore access on web, desktop, and mobile.
               </p>
+            ) : accessStatus === "trial" ? (
+              <div className={cn("mt-4 inline-flex items-center gap-3 rounded-lg border px-4 py-3 font-bold", getTimerTone(currentExpiry, now))}>
+                <Clock3 className="h-5 w-5" />
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] opacity-75">
+                    Shared farm trial · {remainingDays} days left
+                  </p>
+                  <p className="mt-1 text-lg">{formatRemaining(currentExpiry, now)}</p>
+                </div>
+              </div>
             ) : (
               <div className={cn("mt-4 inline-flex items-center gap-3 rounded-lg border px-4 py-3 font-bold", getTimerTone(currentExpiry, now))}>
                 <Clock3 className="h-5 w-5" />
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] opacity-75">Your subscription renews in</p>
-                  <p className="mt-1 text-lg">{formatRemaining(currentExpiry, now)}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] opacity-75">Paid access through</p>
+                  <p className="mt-1 text-lg">{formatDate(periodEndsAt)}</p>
                 </div>
               </div>
             )}
           </div>
-        </div>
-
-        <div className="mt-6 border-t border-white/10 pt-5">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/40">Connected Desktop Devices</p>
-          {devices.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-              No desktop connected yet. Download the desktop app to start your 30-day trial.
-            </p>
-          ) : (
-            <div className="mt-3 grid gap-3">
-              {devices.map((device) => (
-                <div key={device.id} className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/75 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Monitor className="h-5 w-5 shrink-0 text-emerald-300" />
-                    <span className="truncate font-semibold text-white">
-                      {device.deviceName || device.hardwareId || "Unnamed desktop"}
-                    </span>
-                  </div>
-                  <span className="font-medium text-white/65">{getDeviceAccessLabel(device)}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
@@ -295,7 +254,7 @@ export default function LicenseUpgradeClient({
         {plans.map((plan) => {
           const pricing = getTermPricing(selectedMonths, plan.price);
           const Icon = plan.icon;
-          const isCurrent = currentTier === plan.tier;
+          const isCurrent = accessStatus === "paid" && currentTier === plan.tier;
 
           return (
             <div key={plan.tier} className="relative h-full">

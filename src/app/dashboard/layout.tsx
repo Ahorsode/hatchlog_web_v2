@@ -7,6 +7,8 @@ import { resolveFarmNavigationRole } from '@/lib/navigation-permissions';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { hatchlogMe, hatchlogFarms } from '@/lib/hatchlog-api';
+import { getFarmSubscriptionStatus } from '@/lib/subscription-utils';
+import { LockedFarmShell } from './LockedFarmShell';
 
 export default async function DashboardLayout({
   children,
@@ -110,6 +112,11 @@ export default async function DashboardLayout({
     ? rawFarmName
     : `${rawFarmName} Farm`;
 
+  const subscription = farm?.id
+    ? await getFarmSubscriptionStatus(farm.id)
+    : null;
+  const farmLocked = subscription?.status === 'locked';
+
   return (
     <SidebarWrapper role={navigationRole} permissions={userPermissions}>
       <div className="md:hidden sticky top-[-1.5rem] z-40 -mx-4 mb-2 px-3 py-2 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-center">
@@ -117,7 +124,11 @@ export default async function DashboardLayout({
           {mobileFarmTitle}
         </h1>
       </div>
-      {children}
+      {farmLocked ? (
+        <LockedFarmShell farmName={rawFarmName}>{children}</LockedFarmShell>
+      ) : (
+        children
+      )}
     </SidebarWrapper>
   );
 }

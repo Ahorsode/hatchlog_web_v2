@@ -119,7 +119,6 @@ export async function adminExtendTrial(
     })
 
     revalidateFarmAdminPaths(farmId)
-    revalidatePath('/dashboard/settings/desktop-licenses')
 
     return { success: true }
   } catch (error) {
@@ -146,7 +145,6 @@ export async function adminRevokeFarmAccess(farmId: string): Promise<AdminFarmAc
     })
 
     revalidateFarmAdminPaths(farmId)
-    revalidatePath('/dashboard/settings/desktop-licenses')
 
     return { success: true }
   } catch (error) {

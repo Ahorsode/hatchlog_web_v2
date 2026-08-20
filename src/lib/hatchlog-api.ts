@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import { getSupabaseAccessToken } from '@/lib/supabase/session'
 
 type SyncMutation = {
@@ -177,7 +178,7 @@ export async function hatchlogHealth() {
   return response.json()
 }
 
-export async function hatchlogMe() {
+export const hatchlogMe = cache(async () => {
   return requestJson<{
     id: string
     email: string | null
@@ -191,7 +192,7 @@ export async function hatchlogMe() {
     farmIds: string[]
     supabaseSub: string
   }>('/api/v1/me', { method: 'GET' })
-}
+})
 
 export async function hatchlogProfileByIdentity(email?: string, phone?: string) {
   const query: Record<string, string> = {}
@@ -231,9 +232,9 @@ export async function hatchlogBootstrapProfile(body: {
   )
 }
 
-export async function hatchlogFarms() {
+export const hatchlogFarms = cache(async () => {
   return requestJson('/api/v1/farms', { method: 'GET' })
-}
+})
 
 // --- Phase 1 domain helpers ---
 
@@ -488,17 +489,17 @@ export async function restoreFeeding(id: string, farmId: string) {
 
 // --- Farms / settings ---
 
-export async function getFarm(id: string) {
+export const getFarm = cache(async (id: string) => {
   return requestJson(`/api/v1/farms/${id}`, { method: 'GET' })
-}
+})
 
 export async function updateFarm(id: string, body: Record<string, unknown>) {
   return requestJson(`/api/v1/farms/${id}`, { method: 'PATCH', body })
 }
 
-export async function getFarmSettings(id: string) {
+export const getFarmSettings = cache(async (id: string) => {
   return requestJson(`/api/v1/farms/${id}/settings`, { method: 'GET' })
-}
+})
 
 export async function updateFarmSettingsApi(
   id: string,
@@ -949,10 +950,13 @@ export async function listActiveExpenseAllocationBatchesApi(farmId: string) {
   })
 }
 
-export async function listLedger(farmId: string) {
+export async function listLedger(farmId: string, options?: { limit?: number }) {
   return requestJson('/api/v1/ledger', {
     method: 'GET',
-    query: { farm_id: farmId },
+    query: {
+      farm_id: farmId,
+      ...(options?.limit ? { limit: String(options.limit) } : {}),
+    },
   })
 }
 
@@ -1067,8 +1071,8 @@ export async function requestSubscriptionUpgradeApi(
   })
 }
 
-export async function listDesktopLicenses(farmId: string) {
-  return requestJson('/api/v1/subscriptions/licenses', {
+export async function getSubscriptionStatusApi(farmId: string) {
+  return requestJson('/api/v1/subscriptions/status', {
     method: 'GET',
     query: { farm_id: farmId },
   })

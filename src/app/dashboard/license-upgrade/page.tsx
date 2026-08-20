@@ -1,20 +1,19 @@
 import { getAuthContext } from '@/lib/auth-utils'
-import { getDesktopLicenses } from '@/lib/actions/licenses'
-import { getFarm } from '@/lib/hatchlog-api'
+import { getFarmSubscriptionStatus } from '@/lib/subscription-utils'
 import LicenseUpgradeClient from './LicenseUpgradeClient'
 
 export default async function LicenseUpgradePage() {
   const { activeFarmId } = await getAuthContext()
-
-  const [farm, deviceData] = await Promise.all([
-    activeFarmId ? getFarm(activeFarmId).catch(() => null) as Promise<any> : Promise.resolve(null),
-    getDesktopLicenses(),
-  ])
+  const status = activeFarmId
+    ? await getFarmSubscriptionStatus(activeFarmId)
+    : null
 
   return (
     <LicenseUpgradeClient
-      currentTier={farm?.subscriptionTier ?? 'BASIC'}
-      devices={deviceData.licenses}
+      currentTier={status?.tier ?? 'BASIC'}
+      accessStatus={status?.status ?? 'trial'}
+      remainingDays={status?.remainingDays ?? 0}
+      periodEndsAt={status?.periodEndsAt ?? null}
     />
   )
 }

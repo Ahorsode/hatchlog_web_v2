@@ -2,15 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Home, Settings as SettingsIcon, Bell, Shield, Plus, Loader2, Save, CheckCircle2, Monitor, Trash2 } from 'lucide-react';
+import { Home, Settings as SettingsIcon, Bell, Shield, Plus, Loader2, Save, CheckCircle2, Trash2 } from 'lucide-react';
 import { updateFarmInfo, createHouse } from '@/lib/actions/dashboard-actions';
 import { updateFarmSettings, getFarmSettings, getSalesSettings, updateSalesSettings } from '@/lib/actions/preference-actions';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MutationBoundary } from '@/components/ui/MutationFeedback';
-
-const SHOW_USER_DESKTOP_LICENSES = process.env.NEXT_PUBLIC_SHOW_USER_DESKTOP_LICENSES !== 'false';
 
 interface InventoryItem {
   id: string;
@@ -33,11 +31,7 @@ export function SettingsContent({ farm, inventory = [] }: SettingsContentProps) 
 
   useEffect(() => {
     if (activeTabFromUrl === 'desktop-licenses') {
-      if (SHOW_USER_DESKTOP_LICENSES) {
-        router.push('/dashboard/settings/desktop-licenses');
-      } else {
-        router.replace('/dashboard/settings?tab=farm');
-      }
+      router.replace('/dashboard/license-upgrade');
       return;
     }
     setActiveTab(activeTabFromUrl);
@@ -186,16 +180,9 @@ export function SettingsContent({ farm, inventory = [] }: SettingsContentProps) 
     { id: 'preferences', label: 'Stock Levels', icon: SettingsIcon },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'trash', label: 'Data Recovery', icon: Trash2, href: '/dashboard/settings/trash' },
-    { id: 'desktop-licenses', label: 'Connected Devices', icon: Monitor },
-  ].filter((tab) => SHOW_USER_DESKTOP_LICENSES || tab.id !== 'desktop-licenses');
+  ];
 
   const navigateToTab = (tab: (typeof tabs)[number]) => {
-    if (tab.id === 'desktop-licenses') {
-      if (SHOW_USER_DESKTOP_LICENSES) {
-        router.push('/dashboard/settings/desktop-licenses');
-      }
-      return;
-    }
     if ('href' in tab && tab.href) {
       router.push(tab.href);
       return;
