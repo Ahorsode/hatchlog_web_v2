@@ -10,10 +10,11 @@ export default async function LicenseUpgradePage() {
 
   return (
     <LicenseUpgradeClient
-      currentTier={status?.tier ?? 'BASIC'}
+      currentTier={status?.tier ?? 'STANDARD'}
       accessStatus={status?.status ?? 'trial'}
-      remainingDays={status?.remainingDays ?? 0}
+      remainingDays={status?.remainingDays ?? 30}
       periodEndsAt={status?.periodEndsAt ?? null}
+      statusLoaded={Boolean(status)}
     />
   )
 }

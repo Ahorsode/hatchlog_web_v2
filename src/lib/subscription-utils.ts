@@ -59,10 +59,19 @@ export async function canAddWorker(farmId: string): Promise<{ canAdd: boolean; l
   const limit = WORKER_LIMITS[tier]
 
   try {
-    const members = (await listTeamMembers(farmId)) as Array<{ role?: string | null }>
-    const current = Array.isArray(members)
-      ? members.filter((member) => member.role !== 'OWNER').length
+    const result = (await listTeamMembers(farmId)) as {
+      members?: Array<{ role?: string | null; user?: { role?: string | null } }>
+      invitations?: unknown[]
+    }
+    const members = Array.isArray(result?.members) ? result.members : []
+    const nonOwnerCount = members.filter((member) => {
+      const role = String(member.role ?? member.user?.role ?? '').toUpperCase()
+      return role !== 'OWNER'
+    }).length
+    const pendingInvites = Array.isArray(result?.invitations)
+      ? result.invitations.length
       : 0
+    const current = nonOwnerCount + pendingInvites
     return { canAdd: current < limit, limit, current }
   } catch {
     return { canAdd: true, limit, current: 0 }

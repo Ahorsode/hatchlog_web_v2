@@ -136,17 +136,23 @@ export default function LicenseUpgradeClient({
   accessStatus,
   remainingDays,
   periodEndsAt,
+  statusLoaded = true,
 }: {
   currentTier: SubscriptionTier;
   accessStatus: "trial" | "paid" | "locked";
   remainingDays: number;
   periodEndsAt: string | null;
+  statusLoaded?: boolean;
 }) {
   const router = useRouter();
   const [selectedMonths, setSelectedMonths] = useState(1);
   const [now, setNow] = useState(() => new Date());
   const [isUpgrading, startTransition] = useTransition();
   const currentExpiry = periodEndsAt ? new Date(periodEndsAt) : null;
+  const liveRemainingDays =
+    currentExpiry != null
+      ? Math.max(0, Math.ceil((currentExpiry.getTime() - now.getTime()) / DAY_MS))
+      : remainingDays;
 
   React.useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 1000);
@@ -186,12 +192,16 @@ export default function LicenseUpgradeClient({
               <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
                 This farm trial has ended. Request a paid plan to restore access on web, desktop, and mobile.
               </p>
+            ) : !statusLoaded ? (
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">
+                Loading farm subscription status...
+              </p>
             ) : accessStatus === "trial" ? (
               <div className={cn("mt-4 inline-flex items-center gap-3 rounded-lg border px-4 py-3 font-bold", getTimerTone(currentExpiry, now))}>
                 <Clock3 className="h-5 w-5" />
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] opacity-75">
-                    Shared farm trial · {remainingDays} days left
+                    Shared farm trial · {liveRemainingDays} days left
                   </p>
                   <p className="mt-1 text-lg">{formatRemaining(currentExpiry, now)}</p>
                 </div>

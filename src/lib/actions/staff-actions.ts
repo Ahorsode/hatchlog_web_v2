@@ -17,6 +17,7 @@ import {
   listTeamMembers,
   acceptTeamInvitationApi,
 } from '@/lib/hatchlog-api'
+import { canAddWorker } from '@/lib/subscription-utils'
 
 type StaffRole = 'OWNER' | 'MANAGER' | 'WORKER' | 'ACCOUNTANT' | 'FINANCE_OFFICER' | 'CASHIER'
 
@@ -31,6 +32,14 @@ export async function inviteWorker(data: {
 
     const rateLimit = await checkRateLimit({ policy: 'team.invite', scope: 'inviteWorker', farmId: activeFarmId, userId })
     if (!rateLimit.ok) return rateLimitActionError(rateLimit)
+
+    const seatCheck = await canAddWorker(activeFarmId)
+    if (!seatCheck.canAdd) {
+      return {
+        success: false,
+        error: `Worker limit reached (${seatCheck.current}/${seatCheck.limit}). Upgrade your plan to invite more staff.`,
+      }
+    }
 
     const result = await createTeamInvitation({
       farm_id: activeFarmId,
@@ -76,15 +85,54 @@ export async function acceptInvitation(shouldRevalidate = true) {
 }
 
 export async function getFarmMembers() {
-  const { activeFarmId } = await getAuthContext()
-  if (!activeFarmId) return { members: [], invitations: [], isAbsoluteOwner: false }
+  const { userId, activeFarmId, role, isFarmOwner } = await getAuthContext()
+  if (!activeFarmId) {
+    return {
+      members: [],
+      invitations: [],
+      isAbsoluteOwner: false,
+      currentUserRole: 'WORKER',
+      limitCheck: null,
+    }
+  }
 
   try {
-    const result = await listTeamMembers(activeFarmId)
-    return result as any
-  } catch (error: any) {
+    const [result, limitCheck] = await Promise.all([
+      listTeamMembers(activeFarmId),
+      canAddWorker(activeFarmId),
+    ])
+    const payload = result as {
+      members?: Array<{ userId?: string; role?: string; user?: { id?: string; role?: string } }>
+      invitations?: unknown[]
+      isAbsoluteOwner?: boolean
+    }
+
+    let currentUserRole = String(role || 'WORKER').toUpperCase()
+    if (isFarmOwner || payload.isAbsoluteOwner) {
+      currentUserRole = 'OWNER'
+    } else {
+      const membership = (payload.members ?? []).find(
+        (member) => member.userId === userId || member.user?.id === userId,
+      )
+      if (membership?.role) {
+        currentUserRole = String(membership.role).toUpperCase()
+      }
+    }
+
+    return {
+      ...payload,
+      currentUserRole,
+      limitCheck,
+    }
+  } catch (error: unknown) {
     console.error('Error fetching farm members:', error)
-    return { members: [], invitations: [], isAbsoluteOwner: false }
+    return {
+      members: [],
+      invitations: [],
+      isAbsoluteOwner: false,
+      currentUserRole: 'WORKER',
+      limitCheck: null,
+    }
   }
 }
 
