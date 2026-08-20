@@ -36,8 +36,9 @@ export async function getFarmSubscriptionStatus(
 
 export async function getFarmTier(farmId: string): Promise<SubscriptionTier> {
   const status = await getFarmSubscriptionStatus(farmId)
-  if (!status || status.status === 'locked') return 'BASIC'
-  return status.tier || 'BASIC'
+  if (!status) return 'STANDARD'
+  if (status.status === 'locked') return 'BASIC'
+  return status.tier || 'STANDARD'
 }
 
 export async function checkFeature(farmId: string, feature: Feature): Promise<boolean> {

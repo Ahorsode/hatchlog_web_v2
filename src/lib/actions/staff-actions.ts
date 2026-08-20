@@ -21,6 +21,17 @@ import { canAddWorker } from '@/lib/subscription-utils'
 
 type StaffRole = 'OWNER' | 'MANAGER' | 'WORKER' | 'ACCOUNTANT' | 'FINANCE_OFFICER' | 'CASHIER'
 
+function inviteIdentifierParts(value: string): { email?: string; phoneNumber?: string } {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return {}
+  }
+  if (trimmed.includes('@')) {
+    return { email: trimmed.toLowerCase() }
+  }
+  return { phoneNumber: normalizePhoneNumber(trimmed) }
+}
+
 export async function inviteWorker(data: {
   emailOrPhone: string
   role: StaffRole
@@ -41,11 +52,15 @@ export async function inviteWorker(data: {
       }
     }
 
+    const identifier = inviteIdentifierParts(data.emailOrPhone)
+    if (!identifier.email && !identifier.phoneNumber) {
+      return { success: false, error: 'Enter a valid email address or phone number.' }
+    }
+
     const result = await createTeamInvitation({
       farm_id: activeFarmId,
-      emailOrPhone: data.emailOrPhone,
+      ...identifier,
       role: data.role,
-      permissions: data.permissions,
     })
 
     revalidatePath('/dashboard/team')
