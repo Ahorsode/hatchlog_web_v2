@@ -8,7 +8,15 @@ export type EggBatchStockOption = {
   eggsRemaining: number;
 };
 
-export function requiresEggSizeSelection(eggInventory: any[]) {
+export type EggInventoryRow = {
+  id?: string;
+  itemName?: string;
+  item_name?: string;
+  eggCategoryId?: string | number;
+  eggCategory?: { id?: string | number; name?: string };
+};
+
+export function requiresEggSizeSelection(eggInventory: EggInventoryRow[]) {
   if (eggInventory.length <= 1) {
     return false;
   }
@@ -20,13 +28,13 @@ export function requiresEggSizeSelection(eggInventory: any[]) {
   return categories.size > 1 || eggInventory.length > 1;
 }
 
-export function eggSizeLabelFromRow(row: any) {
+export function eggSizeLabelFromRow(row: EggInventoryRow) {
   const name = String(row?.itemName ?? row?.item_name ?? 'Eggs');
   const match = name.match(/\(([^)]+)\)/);
   return match?.[1] ?? name;
 }
 
-export function defaultEggInventoryRow(eggInventory: any[]) {
+export function defaultEggInventoryRow(eggInventory: EggInventoryRow[]) {
   if (eggInventory.length === 0) {
     return null;
   }
@@ -38,7 +46,7 @@ export function defaultEggInventoryRow(eggInventory: any[]) {
   );
 }
 
-export function isUnsortedEggInventory(row: any) {
+export function isUnsortedEggInventory(row: EggInventoryRow | null | undefined) {
   if (!row) {
     return false;
   }
@@ -48,7 +56,7 @@ export function isUnsortedEggInventory(row: any) {
 }
 
 export function resolveEggFifoCategoryFilter(
-  row: any,
+  row: EggInventoryRow,
   eggAllocationMode: EggAllocationMode | string,
 ) {
   if (eggAllocationMode === 'batch') {

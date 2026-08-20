@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import { farmCacheTags } from '@/lib/performance/cache-tags'
@@ -43,11 +43,21 @@ export async function getAllCustomers() {
   if (!activeFarmId) return []
 
   try {
-    const customers = await listCustomers(activeFarmId) as any[]
-    return customers.map(c => ({
-      ...c,
-      balanceOwed: Number(c.balanceOwed ?? 0),
-    }))
+    const cachedLoader = unstable_cache(
+      async () => {
+        const customers = await listCustomers(activeFarmId) as any[]
+        return customers.map(c => ({
+          ...c,
+          balanceOwed: Number(c.balanceOwed ?? 0),
+        }))
+      },
+      [`customers-list:${activeFarmId}`],
+      {
+        revalidate: 60,
+        tags: [farmCacheTags.customers(activeFarmId)],
+      },
+    )
+    return await cachedLoader()
   } catch (error) {
     console.error('Error fetching customers:', error)
     return []

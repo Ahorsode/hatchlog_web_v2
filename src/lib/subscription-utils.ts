@@ -64,8 +64,10 @@ export async function canAddWorker(farmId: string): Promise<{ canAdd: boolean; l
   const limit = WORKER_LIMITS[tier]
 
   try {
-    const members = await listTeamMembers(farmId) as any[]
-    const current = Array.isArray(members) ? members.filter((m: any) => m.role !== 'OWNER').length : 0
+    const members = (await listTeamMembers(farmId)) as Array<{ role?: string | null }>
+    const current = Array.isArray(members)
+      ? members.filter((member) => member.role !== 'OWNER').length
+      : 0
     return { canAdd: current < limit, limit, current }
   } catch {
     return { canAdd: true, limit, current: 0 }

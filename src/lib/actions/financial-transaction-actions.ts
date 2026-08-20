@@ -1,10 +1,10 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
 import {
   type AllocationMode,
   type LedgerAllocationInput,
@@ -24,8 +24,18 @@ export async function getFinancialTransactions() {
   if (!hasViewAccess) return []
 
   try {
-    const rows = await listLedger(activeFarmId)
-    return Array.isArray(rows) ? rows : []
+    const cachedLoader = unstable_cache(
+      async () => {
+        const rows = await listLedger(activeFarmId, { limit: 100 })
+        return Array.isArray(rows) ? rows : []
+      },
+      [`ledger-list:${activeFarmId}`],
+      {
+        revalidate: 30,
+        tags: [farmCacheTags.dashboard(activeFarmId)],
+      },
+    )
+    return await cachedLoader()
   } catch (error: any) {
     console.error('Error fetching financial transactions:', error)
     return []

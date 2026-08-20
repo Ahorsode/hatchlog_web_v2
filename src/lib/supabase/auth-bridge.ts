@@ -2,7 +2,6 @@ import 'server-only'
 
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { hatchlogProfileByIdentity } from '@/lib/hatchlog-api'
-import { buildPhoneLookupCandidates } from '@/lib/phone-auth'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 
 export function syntheticEmailFromPhone(phone: string) {

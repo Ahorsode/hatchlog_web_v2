@@ -1,5 +1,49 @@
 import { formatCurrency } from '@/lib/utils'
-import { BatchLogEntry, LogEntryType, buildBatchLogEntries } from './batch-log-entries'
+import {
+  BatchLogEntry,
+  BatchLogs,
+  ExpenseBreakdownItem,
+  LogEntryType,
+  buildBatchLogEntries,
+} from './batch-log-entries'
+
+type ReportLogRow = {
+  logDate: string | Date
+  amountConsumed?: number | string
+  eggsCollected?: number | string
+  count?: number | string
+  type?: string
+}
+
+type CostOtherEntry = { amount?: number | string }
+
+export type BatchReportPayload = {
+  batch: {
+    batchName?: string
+    breedType?: string
+    house?: { name?: string }
+    status?: string
+    currentCount: number
+    initialCount: number
+    initialCostActual?: number | string
+    initialCostCarriage?: number | string
+    initialCostOther?: CostOtherEntry[]
+    arrivalDate: string | Date
+  }
+  logs: BatchLogs & {
+    feedingLogs?: ReportLogRow[]
+    eggProduction?: ReportLogRow[]
+    mortalityRecords?: ReportLogRow[]
+  }
+  metrics: {
+    ageInDays: number
+    totalFeed: number
+  }
+  finance?: {
+    canViewFinance?: boolean
+    expenseBreakdown?: ExpenseBreakdownItem[]
+  }
+}
 
 export type DurationPreset = 'lifetime' | 'today' | 'weekly' | 'monthly' | 'custom'
 export type ReportFormat = 'pdf' | 'word'
@@ -124,7 +168,7 @@ function inRange(date: string | Date, range: DateRange) {
 }
 
 export function buildBatchReport(
-  data: any,
+  data: BatchReportPayload,
   range: DateRange,
   sections: ReportSectionKey[]
 ): BatchReportDocument {
@@ -154,20 +198,20 @@ export function buildBatchReport(
     range.label === 'Lifetime'
       ? Number(batch.initialCostActual || 0) +
         Number(batch.initialCostCarriage || 0) +
-        (batch.initialCostOther?.reduce((s: number, e: any) => s + Number(e.amount || 0), 0) || 0)
+        (batch.initialCostOther?.reduce((s, e) => s + Number(e.amount || 0), 0) || 0)
       : 0
 
   const periodFeed = (logs.feedingLogs ?? [])
-    .filter((e: any) => inRange(e.logDate, range))
-    .reduce((s: number, e: any) => s + Number(e.amountConsumed || 0), 0)
+    .filter((e) => inRange(e.logDate, range))
+    .reduce((s, e) => s + Number(e.amountConsumed || 0), 0)
 
   const periodEggs = (logs.eggProduction ?? [])
-    .filter((e: any) => inRange(e.logDate, range))
-    .reduce((s: number, e: any) => s + Number(e.eggsCollected || 0), 0)
+    .filter((e) => inRange(e.logDate, range))
+    .reduce((s, e) => s + Number(e.eggsCollected || 0), 0)
 
   const periodMortality = (logs.mortalityRecords ?? [])
-    .filter((m: any) => m.type === 'DEAD' && inRange(m.logDate, range))
-    .reduce((s: number, m: any) => s + Number(m.count || 0), 0)
+    .filter((m) => m.type === 'DEAD' && inRange(m.logDate, range))
+    .reduce((s, m) => s + Number(m.count || 0), 0)
 
   const report: BatchReportDocument = {
     batchName: batch.batchName || 'Batch',
@@ -201,7 +245,7 @@ export function buildBatchReport(
   return report
 }
 
-export function earliestBatchArrivalDate(payloads: any[]) {
+export function earliestBatchArrivalDate(payloads: BatchReportPayload[]) {
   if (payloads.length === 0) return new Date()
   return payloads.reduce((earliest, payload) => {
     const date = new Date(payload.batch.arrivalDate)
@@ -210,7 +254,7 @@ export function earliestBatchArrivalDate(payloads: any[]) {
 }
 
 export function buildCombinedBatchReport(
-  payloads: any[],
+  payloads: BatchReportPayload[],
   range: DateRange,
   sections: ReportSectionKey[]
 ): BatchReportDocument {
@@ -267,7 +311,7 @@ export function buildCombinedBatchReport(
 }
 
 export function buildReportFromSources(
-  payloads: any[],
+  payloads: BatchReportPayload[],
   range: DateRange,
   sections: ReportSectionKey[]
 ) {

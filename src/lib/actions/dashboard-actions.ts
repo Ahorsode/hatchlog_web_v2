@@ -1,9 +1,9 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import { passwordPolicyError } from '@/lib/password-policy'
 import {
@@ -39,11 +39,15 @@ export async function getDashboardStats(): Promise<any> {
   if (!activeFarmId) throw new Error('No active farm selected')
 
   try {
-    const [raw, livestockRaw, inventoryRaw] = await Promise.all([
-      getDashboardStatsApi(activeFarmId) as Promise<any>,
-      listLivestock(activeFarmId, { status: 'active', limit: 100 }).catch(() => []),
-      listInventory(activeFarmId, { filter: 'low', limit: 50 }).catch(() => []),
-    ])
+    const cachedLoader = unstable_cache(
+      async () => getDashboardStatsApi(activeFarmId) as Promise<any>,
+      [`dashboard-stats:${activeFarmId}`],
+      {
+        revalidate: 20,
+        tags: [farmCacheTags.dashboard(activeFarmId)],
+      },
+    )
+    const raw = await cachedLoader()
 
     const seriesEggs = Array.isArray(raw?.series?.eggs) ? raw.series.eggs : []
     const seriesFeed = Array.isArray(raw?.series?.feed) ? raw.series.feed : []
@@ -57,33 +61,32 @@ export async function getDashboardStats(): Promise<any> {
         count: Number(row.value || 0),
       }))
 
-    const livestock = Array.isArray(livestockRaw) ? livestockRaw : []
-    const activeBatches = livestock.map((batch: any, index: number) => ({
+    const nestedBatches = Array.isArray(raw?.activeBatchRows)
+      ? raw.activeBatchRows
+      : []
+    const activeBatches = nestedBatches.map((batch: any, index: number) => ({
       id: batch.id,
       batchName: batch.batchName ?? batch.name ?? null,
-      breed: batch.breed || 'unknown',
-      quantity: Number(batch.currentCount ?? batch.quantity ?? 0),
-      hatchDate: batch.hatchDate || batch.startDate || new Date().toISOString(),
+      breed: batch.breed || batch.breedType || 'unknown',
+      quantity: Number(batch.quantity ?? batch.currentCount ?? 0),
+      hatchDate:
+        batch.hatchDate ||
+        batch.arrivalDate ||
+        batch.startDate ||
+        new Date().toISOString(),
       status: batch.status || 'active',
       houseNumber: batch.house?.name || batch.houseNumber || '',
       numericId: batch.numericId ?? batch.legacyId ?? index + 1,
       type: batch.type || batch.livestockType || 'LAYER',
     }))
 
-    const inventory = Array.isArray(inventoryRaw) ? inventoryRaw : []
-    const lowFeedItems = inventory
-      .filter((item: any) => {
-        const category = String(item.category || item.type || '').toLowerCase()
-        const isFeed = category.includes('feed') || category.includes('mash')
-        const stock = Number(item.stockLevel ?? item.quantity ?? item.currentStock ?? 0)
-        const threshold = Number(item.lowStockThreshold ?? item.minStock ?? 5)
-        return isFeed && stock <= threshold
-      })
-      .map((item: any) => ({
-        name: item.name || item.itemName || 'Feed',
-        stockLevel: Number(item.stockLevel ?? item.quantity ?? item.currentStock ?? 0),
-        category: String(item.category || 'FEED'),
-      }))
+    const lowFeedItems = Array.isArray(raw?.lowFeedItems)
+      ? raw.lowFeedItems.map((item: any) => ({
+          name: item.name || item.itemName || 'Feed',
+          stockLevel: Number(item.stockLevel ?? item.quantity ?? 0),
+          category: String(item.category || 'FEED'),
+        }))
+      : []
 
     return {
       totalBirds: Number(raw?.totalBirdCount ?? raw?.totalBirds ?? 0),

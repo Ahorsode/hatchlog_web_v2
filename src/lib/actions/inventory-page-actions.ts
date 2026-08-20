@@ -1,6 +1,8 @@
 'use server'
 
+import { unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { farmCacheTags } from '@/lib/performance/cache-tags'
 import {
   listInventory,
   listSuppliers,
@@ -48,23 +50,33 @@ export async function getInventoryPageData(
   }
 
   try {
-    const [rawItems, usedUpCount, activeEggStock, suppliers] = await Promise.all([
-      listInventory(activeFarmId, { filter }) as Promise<any[]>,
-      getUsedUpInventoryCountApi(activeFarmId).catch(() => 0),
-      filter === 'active'
-        ? getActiveBatchEggStockApi(activeFarmId).catch(() => ({ totalEggs: 0, batches: [] }))
-        : Promise.resolve({ totalEggs: 0, batches: [] }),
-      listSuppliers(activeFarmId).catch(() => []),
-    ])
+    const cachedLoader = unstable_cache(
+      async () => {
+        const [rawItems, usedUpCount, activeEggStock, suppliers] = await Promise.all([
+          listInventory(activeFarmId, { filter }) as Promise<any[]>,
+          getUsedUpInventoryCountApi(activeFarmId).catch(() => 0),
+          filter === 'active'
+            ? getActiveBatchEggStockApi(activeFarmId).catch(() => ({ totalEggs: 0, batches: [] }))
+            : Promise.resolve({ totalEggs: 0, batches: [] }),
+          listSuppliers(activeFarmId).catch(() => []),
+        ])
 
-    const items = (Array.isArray(rawItems) ? rawItems : []).map(mapInventoryRow)
+        const items = (Array.isArray(rawItems) ? rawItems : []).map(mapInventoryRow)
 
-    return {
-      items,
-      usedUpCount: typeof usedUpCount === 'number' ? usedUpCount : 0,
-      activeEggStock,
-      suppliers: Array.isArray(suppliers) ? suppliers : [],
-    }
+        return {
+          items,
+          usedUpCount: typeof usedUpCount === 'number' ? usedUpCount : 0,
+          activeEggStock,
+          suppliers: Array.isArray(suppliers) ? suppliers : [],
+        }
+      },
+      [`inventory-page:${activeFarmId}:${filter}`],
+      {
+        revalidate: 30,
+        tags: [farmCacheTags.inventory(activeFarmId)],
+      },
+    )
+    return await cachedLoader()
   } catch (error: any) {
     console.error('Error fetching inventory page data:', error)
     return { items: [], usedUpCount: 0, activeEggStock: null, suppliers: [] }

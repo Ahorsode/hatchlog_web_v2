@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { SUBSCRIPTION_TIER_FEATURES } from '../subscription-features'
 
 describe('subscription feature map', () => {

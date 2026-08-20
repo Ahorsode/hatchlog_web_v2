@@ -3,6 +3,82 @@ import { compareNewestFirst } from '@/lib/utils/chronological-sort'
 
 export type LogEntryType = 'FEED' | 'MORTALITY' | 'EGGS' | 'WEIGHT' | 'HEALTH' | 'SALES' | 'EXPENSE'
 
+type LogUser = {
+  firstname: string | null
+  surname: string | null
+  role: string
+}
+
+type FeedingLog = {
+  id: string
+  logDate: string
+  amountConsumed?: number | string
+  inventory?: { itemName?: string; unit?: string }
+  user?: LogUser
+}
+
+type MortalityRecord = {
+  id: string
+  logDate: string
+  count?: number | string
+  type?: string
+  user?: LogUser
+}
+
+type EggProductionRecord = {
+  id: string
+  logDate: string
+  eggsCollected?: number | string
+  user?: LogUser
+}
+
+type WeightRecord = {
+  id: string
+  logDate: string
+  averageWeight?: number | string
+  user?: LogUser
+}
+
+type HealthSchedule = {
+  id: string
+  scheduledDate: string
+  vaccineName?: string
+  medicationName?: string
+  status?: string
+  quantity?: number | string | null
+  unit?: string
+  notes?: string
+}
+
+type SalesRecord = {
+  id: string
+  logDate: string
+  description?: string
+  quantity?: number | string
+  unitPrice?: number | string
+  totalPrice?: number
+}
+
+export type ExpenseBreakdownItem = {
+  id: string
+  date: string
+  description?: string
+  category?: string
+  kind?: string
+  percentage?: number | null
+  amount?: number
+}
+
+export type BatchLogs = {
+  feedingLogs?: FeedingLog[]
+  mortalityRecords?: MortalityRecord[]
+  eggProduction?: EggProductionRecord[]
+  weightRecords?: WeightRecord[]
+  vaccinations?: HealthSchedule[]
+  medications?: HealthSchedule[]
+  salesRecords?: SalesRecord[]
+}
+
 export type BatchLogEntry = {
   id: string
   type: LogEntryType
@@ -10,12 +86,12 @@ export type BatchLogEntry = {
   title: string
   detail: string
   amount?: number
-  user?: any
+  user?: LogUser
 }
 
 export function buildBatchLogEntries(
-  logs: any,
-  expenseBreakdown: any[],
+  logs: BatchLogs,
+  expenseBreakdown: ExpenseBreakdownItem[],
   canViewFinance: boolean
 ): BatchLogEntry[] {
   const entries: BatchLogEntry[] = []
@@ -103,7 +179,7 @@ export function buildBatchLogEntries(
         type: 'SALES',
         date: sale.logDate,
         title: sale.description || 'Sale',
-        detail: `${Number(sale.quantity).toLocaleString()} units @ ${formatCurrency(sale.unitPrice, 'GHS')}`,
+        detail: `${Number(sale.quantity).toLocaleString()} units @ ${formatCurrency(sale.unitPrice ?? 0, 'GHS')}`,
         amount: sale.totalPrice,
       })
     }

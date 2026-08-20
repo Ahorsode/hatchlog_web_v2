@@ -5,16 +5,22 @@ import { getAuthContext } from '@/lib/auth-utils';
 import { getMonthlyProductionSummary } from '@/lib/actions/preference-actions';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
 import { redirect } from 'next/navigation';
-import { listHouses, hatchlogMe, getFarm, getFarmSettings } from '@/lib/hatchlog-api';
+import { listHouses, getFarm, getFarmSettings } from '@/lib/hatchlog-api';
 
 export default async function DashboardPage() {
-  let userId: string;
+  let _userId: string;
   let activeFarmId: string | undefined;
+  let role = 'WORKER';
+  let permissions: Record<string, boolean> | null = null;
+  let isFarmOwner = false;
 
   try {
     const ctx = await getAuthContext();
-    userId = ctx.userId;
+    _userId = ctx.userId;
     activeFarmId = ctx.activeFarmId;
+    role = ctx.isFarmOwner ? 'OWNER' : ctx.role || 'WORKER';
+    permissions = ctx.permissions;
+    isFarmOwner = ctx.isFarmOwner;
   } catch (err: any) {
     const message = err?.message ?? '';
     if (message.startsWith('SESSION_REVOKED:')) {
@@ -37,14 +43,13 @@ export default async function DashboardPage() {
   }
 
   try {
-    const [stats, housesRaw, summary, me, farm, farmSettings] = await Promise.all([
+    const [stats, housesRaw, summary, farm, farmSettings] = await Promise.all([
       getDashboardStats().catch((err) => {
         console.error('[DashboardPage] stats failed:', err);
         return null;
       }),
       listHouses(activeFarmId).catch(() => []),
       getMonthlyProductionSummary(),
-      hatchlogMe().catch(() => null),
       getFarm(activeFarmId).catch(() => null) as Promise<any>,
       getFarmSettings(activeFarmId).catch(() => null) as Promise<any>,
     ]);
@@ -61,7 +66,7 @@ export default async function DashboardPage() {
       );
     }
 
-    const role = me?.isFarmOwner ? 'OWNER' : me?.role || 'WORKER';
+    const displayRole = isFarmOwner ? 'OWNER' : role || 'WORKER';
     const currency = farmSettings?.currency || 'GHS';
     const eggsPerCrate = farmSettings?.eggsPerCrate ?? 30;
     
@@ -77,9 +82,9 @@ export default async function DashboardPage() {
           stats={stats} 
           houses={houses as any} 
           summary={summary} 
-          role={role as any} 
+          role={displayRole as any} 
           subscriptionTier={farm?.subscriptionTier}
-          permissions={me?.permissions}
+          permissions={permissions}
           currency={currency}
           eggsPerCrate={eggsPerCrate}
         />

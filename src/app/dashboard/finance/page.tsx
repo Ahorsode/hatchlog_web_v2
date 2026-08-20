@@ -6,7 +6,7 @@ import { getFinancialTransactions } from '@/lib/actions/financial-transaction-ac
 import { FinanceHubClient } from './FinanceHubClient';
 import { MissingCostPrompt } from '@/components/finance/MissingCostPrompt';
 import { MissingHealthCostPrompt } from '@/components/finance/MissingHealthCostPrompt';
-import { getHealthItemsMissingCost, repairMissingHealthStockExpenses } from '@/lib/actions/health-actions';
+import { getHealthItemsMissingCost } from '@/lib/actions/health-actions';
 import { listLivestock } from '@/lib/hatchlog-api';
 
 export default async function FinancePage() {
@@ -41,10 +41,6 @@ export default async function FinancePage() {
   }
 
   const missingHealthCosts = canEdit ? await getHealthItemsMissingCost() : [];
-
-  if (canEdit) {
-    await repairMissingHealthStockExpenses();
-  }
 
   const transactions = await getFinancialTransactions();
 

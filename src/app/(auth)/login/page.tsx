@@ -26,7 +26,7 @@ export default function LoginPage() {
       setError('Google sign-in failed. Please try again or contact your farm administrator.');
     } else if (authError === 'db') {
       setError(
-        'Signed in with Google, but the farm API rejected the session. Check Nest SUPABASE_JWT_SECRET and HATCHLOG_API_URL, then try again.',
+        'Signed in with Google, but the farm API rejected the session. Check Nest SUPABASE_JWT_SECRET / JWKS and HATCHLOG_API_URL, then try again.',
       );
     } else if (authError === 'user_not_found') {
       setError(
