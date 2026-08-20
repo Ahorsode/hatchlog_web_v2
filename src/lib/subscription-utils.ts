@@ -1,5 +1,3 @@
-'use server'
-
 /**
  * UI feature flags from Nest farm subscription status.
  * Nest API remains the authority for paid access; this only gates UI chrome.
@@ -10,9 +8,6 @@ import {
   type Feature,
   type SubscriptionTier,
 } from './subscription-features'
-
-export type { Feature, SubscriptionTier } from './subscription-features'
-export { SUBSCRIPTION_TIER_FEATURES } from './subscription-features'
 
 export type FarmSubscriptionStatus = {
   status: 'trial' | 'paid' | 'locked'
