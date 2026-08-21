@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, Suspense } from 'react';
+import Image from 'next/image';
 import { HealthBadge } from '@/components/ui/HealthBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useLivestockStats } from '@/hooks/useLivestockStats';
@@ -286,7 +287,7 @@ export function DashboardContent({ stats, houses, summary, role, subscriptionTie
                   )}
                   
                   <div className="absolute -top-10 -right-10 opacity-10 -z-10 blend-modes mix-blend-screen">
-                     <img src="/logo.png" alt="" className="w-64 h-64 rounded-lg object-cover grayscale" />
+                     <Image src="/logo.png" alt="" width={256} height={256} className="w-64 h-64 rounded-lg object-cover grayscale" />
                   </div>
                 </CardContent>
               </Card>

@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import {
   createInventoryApi,
   updateInventoryApi,
@@ -64,7 +64,7 @@ export async function createInventoryItem(data: {
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard')
     revalidateTag(farmCacheTags.inventory(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard')
     return { success: true, item }
   } catch (error: any) {
     console.error('Error creating inventory item:', error)
@@ -91,11 +91,10 @@ export async function updateInventoryItem(id: string, data: {
     const item = await updateInventoryApi(id, { farm_id: activeFarmId, ...data })
 
     revalidatePath('/dashboard/inventory')
-    revalidatePath('/dashboard')
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/reports')
     revalidateTag(farmCacheTags.inventory(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
     return { success: true, item }
   } catch (error: any) {
     console.error('Error updating inventory item:', error)
@@ -117,7 +116,7 @@ export async function deleteInventoryItem(id: string, reason: string) {
 
     revalidatePath('/dashboard/inventory')
     revalidateTag(farmCacheTags.inventory(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard')
     return { success: true }
   } catch (error: any) {
     console.error('Error deleting inventory item:', error)
@@ -138,7 +137,7 @@ export async function restoreInventory(id: string) {
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/settings/trash')
     revalidateTag(farmCacheTags.inventory(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard')
     return { success: true }
   } catch (error: any) {
     console.error('Error restoring inventory item:', error)

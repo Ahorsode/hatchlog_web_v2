@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { getSupabaseAccessToken } from '@/lib/supabase/session'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import { farmCacheTags } from '@/lib/performance/cache-tags'
 import {
@@ -43,9 +44,11 @@ export async function getAllCustomers() {
   if (!activeFarmId) return []
 
   try {
+    const accessToken = await getSupabaseAccessToken()
+
     const cachedLoader = unstable_cache(
       async () => {
-        const customers = await listCustomers(activeFarmId) as any[]
+        const customers = await listCustomers(activeFarmId, accessToken) as any[]
         return customers.map(c => ({
           ...c,
           balanceOwed: Number(c.balanceOwed ?? 0),

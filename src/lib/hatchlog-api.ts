@@ -43,13 +43,17 @@ export function isHatchlogApiConfigured() {
   return Boolean(apiBaseUrl())
 }
 
-async function resolveAuthHeaders(userId?: string): Promise<HeadersInit> {
-  const accessToken = await getSupabaseAccessToken()
-  if (accessToken) {
+async function resolveAuthHeaders(
+  userId?: string,
+  accessToken?: string | null,
+): Promise<HeadersInit> {
+  const token =
+    accessToken !== undefined ? accessToken : await getSupabaseAccessToken()
+  if (token) {
     return {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${token}`,
     }
   }
 
@@ -88,6 +92,8 @@ async function requestJson<T>(
      * `none`: never send auth (Nest @Public routes like profile bootstrap).
      */
     auth?: 'required' | 'optional' | 'none'
+    /** When set, skips cookie-based session lookup (for unstable_cache callers). */
+    accessToken?: string | null
   },
 ): Promise<T> {
   const url = new URL(`${apiBaseUrl()}${path}`)
@@ -103,12 +109,12 @@ async function requestJson<T>(
     headers = publicJsonHeaders()
   } else if (authMode === 'optional') {
     try {
-      headers = await resolveAuthHeaders(options.userId)
+      headers = await resolveAuthHeaders(options.userId, options.accessToken)
     } catch {
       headers = publicJsonHeaders()
     }
   } else {
-    headers = await resolveAuthHeaders(options.userId)
+    headers = await resolveAuthHeaders(options.userId, options.accessToken)
   }
 
   const response = await fetch(url, {
@@ -608,6 +614,7 @@ export async function getTeamInviteUserApi(inviteId: string, farmId: string) {
 export async function listInventory(
   farmId: string,
   options?: { category?: string; filter?: string; limit?: number },
+  accessToken?: string | null,
 ) {
   return requestJson('/api/v1/inventory', {
     method: 'GET',
@@ -617,6 +624,7 @@ export async function listInventory(
       ...(options?.filter ? { filter: options.filter } : {}),
       ...(options?.limit ? { limit: String(options.limit) } : {}),
     },
+    accessToken,
   })
 }
 
@@ -659,10 +667,14 @@ export async function getEggInventoryStock(farmId: string) {
   })
 }
 
-export async function getUsedUpInventoryCountApi(farmId: string) {
+export async function getUsedUpInventoryCountApi(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson<number>('/api/v1/inventory/used-up-count', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 
@@ -673,10 +685,14 @@ export async function getSellableEggInventoryApi(farmId: string) {
   })
 }
 
-export async function getActiveBatchEggStockApi(farmId: string) {
+export async function getActiveBatchEggStockApi(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/inventory/eggs/batch-stock', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 
@@ -692,10 +708,14 @@ export async function getEggFifoAvailabilityApi(farmId: string) {
 
 // --- Customers / suppliers ---
 
-export async function listCustomers(farmId: string) {
+export async function listCustomers(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/customers', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 
@@ -717,10 +737,14 @@ export async function getCustomerStats(farmId: string) {
   })
 }
 
-export async function listSuppliers(farmId: string) {
+export async function listSuppliers(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/suppliers', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 
@@ -745,10 +769,14 @@ export async function updateSupplierBalanceApi(
   })
 }
 
-export async function getSupplierStats(farmId: string) {
+export async function getSupplierStats(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/suppliers/stats', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 
@@ -950,13 +978,18 @@ export async function listActiveExpenseAllocationBatchesApi(farmId: string) {
   })
 }
 
-export async function listLedger(farmId: string, options?: { limit?: number }) {
+export async function listLedger(
+  farmId: string,
+  options?: { limit?: number },
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/ledger', {
     method: 'GET',
     query: {
       farm_id: farmId,
       ...(options?.limit ? { limit: String(options.limit) } : {}),
     },
+    accessToken,
   })
 }
 
@@ -996,10 +1029,14 @@ export async function getMonthlyProductionSummaryApi(farmId: string) {
   })
 }
 
-export async function getDashboardStatsApi(farmId: string) {
+export async function getDashboardStatsApi(
+  farmId: string,
+  accessToken?: string | null,
+) {
   return requestJson('/api/v1/dashboard/stats', {
     method: 'GET',
     query: { farm_id: farmId },
+    accessToken,
   })
 }
 

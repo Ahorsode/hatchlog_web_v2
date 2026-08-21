@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import {
   createEgg,
   deleteEgg,
@@ -70,7 +70,7 @@ export async function createEggProduction(data: {
     })
     revalidatePath('/dashboard/eggs')
     revalidatePath('/dashboard/inventory')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'inventory')
     return { success: true, log }
   } catch (error: any) {
     console.error('Error creating egg production log:', error)
@@ -105,7 +105,7 @@ export async function updateEggProduction(id: string, data: {
   try {
     const log = await updateEgg(id, data)
     revalidatePath('/dashboard/eggs')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard')
     return { success: true, log }
   } catch (error: any) {
     console.error('Error updating egg production log:', error)
@@ -133,7 +133,7 @@ export async function deleteEggProduction(id: string, reason: string) {
   try {
     await deleteEgg(id)
     revalidatePath('/dashboard/eggs')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard')
     return { success: true }
   } catch (error: any) {
     console.error('Error deleting egg production log:', error)

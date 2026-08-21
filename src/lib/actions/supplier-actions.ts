@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { getSupabaseAccessToken } from '@/lib/supabase/session'
 import { checkWorkerPermissions } from './staff-actions'
 import { farmCacheTags } from '@/lib/performance/cache-tags'
 import {
@@ -18,9 +19,11 @@ export async function getSuppliers() {
   const hasViewAccess = await checkWorkerPermissions('finance', 'view')
   if (!hasViewAccess) return []
 
+  const accessToken = await getSupabaseAccessToken()
+
   const cachedLoader = unstable_cache(
     async () => {
-      return await listSuppliers(activeFarmId) as any[]
+      return await listSuppliers(activeFarmId, accessToken) as any[]
     },
     [`suppliers-list:${activeFarmId}`],
     {
@@ -42,9 +45,11 @@ export async function getSupplierStats() {
   const hasViewAccess = await checkWorkerPermissions('customers', 'view')
   if (!hasViewAccess) return []
 
+  const accessToken = await getSupabaseAccessToken()
+
   const cachedLoader = unstable_cache(
     async () => {
-      return await getSupplierStatsApi(activeFarmId) as any[]
+      return await getSupplierStatsApi(activeFarmId, accessToken) as any[]
     },
     [`suppliers-stats:${activeFarmId}`],
     {

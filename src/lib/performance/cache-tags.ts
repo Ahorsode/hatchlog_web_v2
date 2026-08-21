@@ -13,13 +13,14 @@ export const farmCacheTags = {
   feedDynamic: (farmId: string) => `farm:${farmId}:feed:dynamic`,
 };
 
-export function revalidateFarmPerformanceCaches(farmId: string) {
-  revalidateTag(farmCacheTags.dashboard(farmId), "max");
-  revalidateTag(farmCacheTags.analytics(farmId), "max");
-  revalidateTag(farmCacheTags.reports(farmId), "max");
-  revalidateTag(farmCacheTags.inventory(farmId), "max");
-  revalidateTag(farmCacheTags.sales(farmId), "max");
-  revalidateTag(farmCacheTags.customers(farmId), "max");
-  revalidateTag(farmCacheTags.suppliers(farmId), "max");
-}
+export type FarmCacheTagKey = keyof typeof farmCacheTags;
 
+/** Revalidate only the farm cache tags that match data actually changed. */
+export function revalidateFarmCacheTags(
+  farmId: string,
+  ...tags: FarmCacheTagKey[]
+) {
+  for (const tag of tags) {
+    revalidateTag(farmCacheTags[tag](farmId), "max");
+  }
+}

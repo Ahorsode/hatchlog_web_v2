@@ -1,9 +1,9 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from '@/lib/actions/staff-actions'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import {
   listHealthSchedules,
   createHealthSchedulesApi,
@@ -249,7 +249,8 @@ export async function setHealthItemCost(data: {
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/reports')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateTag(farmCacheTags.inventory(activeFarmId), 'max')
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
 
     return { success: true }
   } catch (error: any) {

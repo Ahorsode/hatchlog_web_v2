@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Phone, ArrowRight, Loader2, Plus, Lock, ShieldAlert } from 'lucide-react';
@@ -128,7 +129,7 @@ export default function LoginPage() {
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", delay: 0.2, bounce: 0.5 }}
                   >
-                    <img src="/logo.png" alt="Agri-ERP Logo" className="w-20 h-20 rounded-lg object-cover shadow-lg shadow-emerald-500/20" />
+                    <Image src="/logo.png" alt="Agri-ERP Logo" width={80} height={80} className="w-20 h-20 rounded-lg object-cover shadow-lg shadow-emerald-500/20" />
                   </motion.div>
                   
                   <div className="space-y-2">
@@ -258,7 +259,7 @@ export default function LoginPage() {
                 transition={{ type: "spring", bounce: 0.6 }}
                 className="w-32 h-32 rounded-lg flex items-center justify-center shadow-[0_0_100px_rgba(16,185,129,0.4)]"
               >
-                <img src="/logo.png" alt="Agri-ERP Logo" className="w-32 h-32 object-cover rounded-lg" />
+                <Image src="/logo.png" alt="Agri-ERP Logo" width={128} height={128} className="w-32 h-32 object-cover rounded-lg" />
               </motion.div>
               <motion.h2 
                 initial={{ opacity: 0, y: 20 }}

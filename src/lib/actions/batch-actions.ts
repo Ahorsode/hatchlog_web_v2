@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import {
   createLivestock,
@@ -57,7 +57,7 @@ export async function createBatch(data: {
       type: data.type || 'POULTRY_BROILER',
     })
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true as const, id: (batch as any).id as string, batch }
   } catch (error: any) {
     console.error('Error creating batch:', error)
@@ -88,7 +88,7 @@ export async function updateBatch(id: string, data: {
   try {
     const batch = await updateLivestock(id, data)
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true, batch }
   } catch (error: any) {
     console.error('Error updating batch:', error)
@@ -111,7 +111,7 @@ export async function deleteBatch(id: string, reason: string) {
   try {
     await deleteLivestock(id, reason.trim())
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true }
   } catch (error: any) {
     console.error('Error deleting batch:', error)
@@ -133,7 +133,7 @@ export async function restoreBatch(id: string) {
     await restoreLivestock(id, activeFarmId)
     revalidatePath('/dashboard/flocks')
     revalidatePath('/dashboard/settings/trash')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true }
   } catch (error: any) {
     console.error('Error restoring batch:', error)
@@ -173,7 +173,7 @@ export async function logHealthEvent(data: {
       subCategory: data.subCategory,
     })
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true, record }
   } catch (error: any) {
     console.error('Error logging health event:', error)
@@ -202,7 +202,7 @@ export async function transferToIsolation(id: string, count: number) {
       count,
     })
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true }
   } catch (error: any) {
     console.error('Error transferring to isolation:', error)
@@ -227,7 +227,7 @@ export async function returnFromIsolation(id: string, count: number) {
       count,
     })
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true }
   } catch (error: any) {
     console.error('Error returning from isolation:', error)
@@ -261,7 +261,7 @@ export async function logMortalityInIsolation(data: {
       subCategory: data.subCategory,
     })
     revalidatePath('/dashboard/flocks')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics')
     return { success: true, record }
   } catch (error: any) {
     console.error('Error logging isolation mortality:', error)

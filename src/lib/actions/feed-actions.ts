@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import {
   createFeeding,
   createFeedFormulationApi,
@@ -63,7 +63,7 @@ export async function createFeedFormulation(data: {
     })
     revalidatePath('/dashboard/feed')
     revalidateTag(farmCacheTags.feedStatic(activeFarmId), 'max')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'inventory')
     return { success: true, formulation }
   } catch (error: any) {
     console.error('Error creating feed formulation:', error)
@@ -169,7 +169,7 @@ export async function createFeedingLog(data: {
     })
     revalidatePath('/dashboard/feed')
     revalidateTag(farmCacheTags.feedDynamic(activeFarmId), 'max')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'inventory')
     return { success: true, log }
   } catch (error: any) {
     console.error('Error creating feeding log:', error)

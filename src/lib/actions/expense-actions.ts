@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import {
   listExpenses,
@@ -105,8 +105,10 @@ export async function createExpense(data: {
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/flocks/analytics')
     revalidatePath('/dashboard/reports')
-    revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports', 'analytics')
+    if (data.supplierId) {
+      revalidateFarmCacheTags(activeFarmId, 'suppliers')
+    }
     if (Array.isArray(data.allocations)) {
       for (const row of data.allocations) {
         if (row.batchId) revalidatePath(`/dashboard/flocks/${row.batchId}`)
@@ -134,7 +136,7 @@ export async function deleteExpense(id: string, reason: string) {
   try {
     await deleteExpenseApi(id, activeFarmId)
     revalidatePath('/dashboard/finance')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
     return { success: true }
   } catch (error: any) {
     console.error('Error deleting expense:', error)
@@ -157,7 +159,7 @@ export async function restoreExpense(id: string) {
     await restoreTrashItem('expenses', id, activeFarmId)
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/settings/trash')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
     return { success: true }
   } catch (error: any) {
     console.error('Error restoring expense:', error)

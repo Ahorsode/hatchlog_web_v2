@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getAuthContext, hasPermission } from '@/lib/auth-utils'
-import { revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import {
   createOrderApi,
@@ -65,11 +65,9 @@ export async function createOrder(data: {
       items: data.items,
     })
 
-    revalidatePath('/dashboard/orders')
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/finance')
-    revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'sales', 'inventory', 'dashboard', 'customers')
     return { success: true, order }
   } catch (error: any) {
     console.error('Error creating order:', error)
@@ -101,11 +99,10 @@ export async function updateOrderStatus(id: string, status: string) {
   try {
     const result = await updateOrderStatusApi(id, { farm_id: activeFarmId, status })
 
-    revalidatePath('/dashboard/orders')
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/finance')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'sales', 'inventory', 'dashboard', 'customers')
     return { success: true, order: result }
   } catch (error: any) {
     console.error('Error updating order status:', error)
@@ -130,8 +127,7 @@ export async function deleteOrder(id: string, reason: string) {
   try {
     await deleteOrderApi(id, activeFarmId)
     revalidatePath('/dashboard/sales')
-    revalidatePath('/dashboard/orders')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'sales', 'dashboard', 'customers')
     return { success: true, message: 'Order moved to trash' }
   } catch (error: any) {
     console.error('Error deleting order:', error)
@@ -154,9 +150,8 @@ export async function restoreOrder(id: string) {
   try {
     await restoreOrderApi(id, activeFarmId)
     revalidatePath('/dashboard/sales')
-    revalidatePath('/dashboard/orders')
     revalidatePath('/dashboard/settings/trash')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'sales', 'dashboard', 'customers')
     return { success: true, message: 'Order restored successfully' }
   } catch (error: any) {
     console.error('Error restoring order:', error)

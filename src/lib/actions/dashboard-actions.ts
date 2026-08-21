@@ -1,9 +1,11 @@
 'use server'
 
-import { revalidatePath, unstable_cache } from 'next/cache'
+import { cache } from 'react'
+import { revalidatePath } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { getSupabaseAccessToken } from '@/lib/supabase/session'
 import { checkWorkerPermissions } from './staff-actions'
-import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import { passwordPolicyError } from '@/lib/password-policy'
 import {
@@ -34,20 +36,17 @@ import {
   updateBatchFinancialsApi,
 } from '@/lib/hatchlog-api'
 
+const loadDashboardStats = cache(async (farmId: string, accessToken: string | null) => {
+  return getDashboardStatsApi(farmId, accessToken) as Promise<any>
+})
+
 export async function getDashboardStats(): Promise<any> {
   const { activeFarmId } = await getAuthContext()
   if (!activeFarmId) throw new Error('No active farm selected')
 
   try {
-    const cachedLoader = unstable_cache(
-      async () => getDashboardStatsApi(activeFarmId) as Promise<any>,
-      [`dashboard-stats:${activeFarmId}`],
-      {
-        revalidate: 20,
-        tags: [farmCacheTags.dashboard(activeFarmId)],
-      },
-    )
-    const raw = await cachedLoader()
+    const accessToken = await getSupabaseAccessToken()
+    const raw = await loadDashboardStats(activeFarmId, accessToken)
 
     const seriesEggs = Array.isArray(raw?.series?.eggs) ? raw.series.eggs : []
     const seriesFeed = Array.isArray(raw?.series?.feed) ? raw.series.feed : []
@@ -146,10 +145,9 @@ export async function updateBatchFinancials(id: string, data: {
       carriageInward: data.carriageInward,
       otherExpenses: data.otherExpenses,
     })
-    revalidatePath('/dashboard')
     revalidatePath('/dashboard/accounting')
     revalidatePath('/dashboard/finance')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'analytics', 'reports')
     return { success: true }
   } catch (error: any) {
     console.error('Error updating financials:', error)
@@ -203,7 +201,7 @@ export async function logFeeding(data: {
       formulationId: data.formulationId,
     })
     revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'inventory')
     return { success: true, log }
   } catch (error: any) {
     console.error('Error logging feeding:', error)

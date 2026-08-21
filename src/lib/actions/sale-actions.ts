@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
 import { checkWorkerPermissions } from './staff-actions'
-import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
 import {
   createSaleApi,
@@ -35,7 +35,7 @@ export async function createSale(data: {
     revalidatePath('/dashboard/inventory')
     revalidateTag(farmCacheTags.sales(activeFarmId), "max")
     revalidateTag(farmCacheTags.inventory(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'customers')
     return { success: true, sale }
   } catch (error: any) {
     console.error('Error creating sale:', error)
@@ -60,7 +60,7 @@ export async function deleteSale(id: string, reason: string) {
 
     revalidatePath('/dashboard/sales')
     revalidateTag(farmCacheTags.sales(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'customers')
     return { success: true }
   } catch (error: any) {
     console.error('Error deleting sale:', error)
@@ -84,7 +84,7 @@ export async function restoreSale(id: string) {
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/settings/trash')
     revalidateTag(farmCacheTags.sales(activeFarmId), "max")
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'customers')
     return { success: true }
   } catch (error: any) {
     console.error('Error restoring sale:', error)

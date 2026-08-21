@@ -2,9 +2,10 @@
 
 import { revalidatePath, unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { getSupabaseAccessToken } from '@/lib/supabase/session'
 import { checkWorkerPermissions } from './staff-actions'
 import { checkRateLimit, rateLimitActionError } from '@/lib/performance/rate-limit'
-import { farmCacheTags, revalidateFarmPerformanceCaches } from '@/lib/performance/cache-tags'
+import { farmCacheTags, revalidateFarmCacheTags } from '@/lib/performance/cache-tags'
 import {
   type AllocationMode,
   type LedgerAllocationInput,
@@ -24,9 +25,11 @@ export async function getFinancialTransactions() {
   if (!hasViewAccess) return []
 
   try {
+    const accessToken = await getSupabaseAccessToken()
+
     const cachedLoader = unstable_cache(
       async () => {
-        const rows = await listLedger(activeFarmId, { limit: 100 })
+        const rows = await listLedger(activeFarmId, { limit: 100 }, accessToken)
         return Array.isArray(rows) ? rows : []
       },
       [`ledger-list:${activeFarmId}`],
@@ -89,8 +92,7 @@ export async function createFinancialTransaction(data: {
 
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/reports')
-    revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
 
     if (Array.isArray(data.allocations)) {
       for (const row of data.allocations) {
@@ -128,8 +130,7 @@ export async function settleTransaction(id: string, referenceNum?: string) {
 
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/reports')
-    revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
 
     return { success: true }
   } catch (error: any) {
@@ -162,8 +163,7 @@ export async function deleteFinancialTransaction(id: string, reason: string) {
 
     revalidatePath('/dashboard/finance')
     revalidatePath('/dashboard/reports')
-    revalidatePath('/dashboard')
-    revalidateFarmPerformanceCaches(activeFarmId)
+    revalidateFarmCacheTags(activeFarmId, 'dashboard', 'reports')
 
     return { success: true }
   } catch (error: any) {

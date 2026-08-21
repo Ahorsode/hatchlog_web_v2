@@ -2,6 +2,7 @@
 
 import { unstable_cache } from 'next/cache'
 import { getAuthContext } from '@/lib/auth-utils'
+import { getSupabaseAccessToken } from '@/lib/supabase/session'
 import { farmCacheTags } from '@/lib/performance/cache-tags'
 import {
   listInventory,
@@ -50,15 +51,17 @@ export async function getInventoryPageData(
   }
 
   try {
+    const accessToken = await getSupabaseAccessToken()
+
     const cachedLoader = unstable_cache(
       async () => {
         const [rawItems, usedUpCount, activeEggStock, suppliers] = await Promise.all([
-          listInventory(activeFarmId, { filter }) as Promise<any[]>,
-          getUsedUpInventoryCountApi(activeFarmId).catch(() => 0),
+          listInventory(activeFarmId, { filter }, accessToken) as Promise<any[]>,
+          getUsedUpInventoryCountApi(activeFarmId, accessToken).catch(() => 0),
           filter === 'active'
-            ? getActiveBatchEggStockApi(activeFarmId).catch(() => ({ totalEggs: 0, batches: [] }))
+            ? getActiveBatchEggStockApi(activeFarmId, accessToken).catch(() => ({ totalEggs: 0, batches: [] }))
             : Promise.resolve({ totalEggs: 0, batches: [] }),
-          listSuppliers(activeFarmId).catch(() => []),
+          listSuppliers(activeFarmId, accessToken).catch(() => []),
         ])
 
         const items = (Array.isArray(rawItems) ? rawItems : []).map(mapInventoryRow)
