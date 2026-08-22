@@ -42,29 +42,65 @@ export default async function DashboardPage() {
     );
   }
 
+  const emptyStats = {
+    totalBirds: 0,
+    mortalityRate: '0',
+    overallDead: 0,
+    todayDead: 0,
+    totalEggs: 0,
+    todayEggs: 0,
+    lowFeedAlertsCount: 0,
+    lowFeedItems: [] as Array<{ name: string; stockLevel: number; category: string }>,
+    eggTrendData: [] as Array<{ date: string; count: number }>,
+    feedTrendData: [] as Array<{ date: string; count: number }>,
+    revenueTrendData: [] as Array<{ date: string; count: number }>,
+    mortalityTrendData: [] as Array<{ date: string; count: number }>,
+    alerts: [] as Array<{
+      type: 'VACCINE' | 'MEDICATION' | 'EGGS' | 'FEED';
+      title: string;
+      message: string;
+      severity: 'warning' | 'error' | 'info';
+    }>,
+    activeBatches: [] as Array<{
+      id: string;
+      batchName: string | null;
+      breed: string;
+      quantity: number;
+      hatchDate: string;
+      status: string;
+      houseNumber: string;
+      numericId: number;
+      type: string;
+    }>,
+    productivityIndex: 0,
+    executiveStats: undefined,
+    strategicPriorities: [] as Array<{
+      title: string;
+      detail: string;
+      type: 'finance' | 'stock' | 'performance';
+    }>,
+    revenueVelocityData: [] as Array<{
+      date: string;
+      revenue: number;
+      target: number;
+    }>,
+    supplierDebt: 0,
+    customerDebt: 0,
+  };
+
   try {
+    let statsFailed = false;
     const [stats, housesRaw, summary, farm, farmSettings] = await Promise.all([
       getDashboardStats().catch((err) => {
         console.error('[DashboardPage] stats failed:', err);
-        return null;
+        statsFailed = true;
+        return emptyStats;
       }),
       listHouses(activeFarmId).catch(() => []),
       getMonthlyProductionSummary(),
       getFarm(activeFarmId).catch(() => null) as Promise<any>,
       getFarmSettings(activeFarmId).catch(() => null) as Promise<any>,
     ]);
-
-    if (!stats) {
-      return (
-        <div className="p-7 text-center bg-amber-50 rounded-lg border border-amber-200">
-          <h2 className="text-xl font-bold text-amber-800 mb-2">Dashboard data unavailable</h2>
-          <p className="text-amber-700">
-            Your farm is set up, but KPI stats could not be loaded from the API. Refresh in a moment.
-            If this continues, check Nest farm permissions / auth guard order.
-          </p>
-        </div>
-      );
-    }
 
     const displayRole = isFarmOwner ? 'OWNER' : role || 'WORKER';
     const currency = farmSettings?.currency || 'GHS';
@@ -78,6 +114,13 @@ export default async function DashboardPage() {
     
     return (
       <PullToRefresh>
+        {statsFailed ? (
+          <div className="mb-4 p-4 text-center bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-sm font-medium text-amber-800">
+              KPI stats could not be refreshed. Showing empty totals — pull down to retry.
+            </p>
+          </div>
+        ) : null}
         <DashboardContent 
           stats={stats} 
           houses={houses as any} 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Users, Mail, Shield, UserPlus, Loader2, CheckCircle2, XCircle, Trash2, ShieldCheck, UserCheck, Settings, AlertCircle, Phone, ChevronDown, RotateCcw } from 'lucide-react';
 import { inviteWorker, getFarmMembers, deleteMember, deleteInvitation, updateWorkerPermissions, resetWorkerPermissions, updateFarmMemberRole, getUserForInvite } from '@/lib/actions/staff-actions';
 import { getDefaultPermissionsForRole } from '@/lib/staff-permission-defaults';
+import { WORKER_PLACEHOLDER_PASSWORD } from '@/lib/phone-auth';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
@@ -83,7 +84,10 @@ export default function TeamView({ canEdit = true }: { canEdit?: boolean }) {
         permissions: Object.keys(pendingPermissions).length > 0 ? pendingPermissions : undefined,
       }) as any;
       if (result?.success) {
-        setMessage({ type: 'success', text: `Invitation sent to ${emailOrPhone}!` });
+        setMessage({
+          type: 'success',
+          text: `${emailOrPhone} can now log in with password ${WORKER_PLACEHOLDER_PASSWORD} — they'll be asked to set a new one on first login.`,
+        });
         form.reset();
         setInviteRole('WORKER');
         setPendingPermissions({});

@@ -2,7 +2,6 @@ import React from 'react';
 import { getAppSessionUser } from '@/lib/supabase/session';
 import { redirect } from 'next/navigation';
 import { SidebarWrapper } from '@/components/layout/SidebarWrapper';
-import { acceptInvitation } from '@/lib/actions/staff-actions';
 import { resolveFarmNavigationRole } from '@/lib/navigation-permissions';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -32,7 +31,9 @@ export default async function DashboardLayout({
   try {
     me = await hatchlogMe();
     const farms = await hatchlogFarms() as any[];
-    farm = Array.isArray(farms) && farms.length > 0 ? farms[0] : null;
+    farm = Array.isArray(farms)
+      ? (farms.find((row: any) => row.id === me?.activeFarmId) ?? farms[0] ?? null)
+      : null;
   } catch (error) {
     console.error('[DashboardLayout] API error:', error);
     redirect('/api/auth/force-login?error=db');
@@ -45,22 +46,6 @@ export default async function DashboardLayout({
   const isPlaceholder = farm && farm.capacity === 0 && farm.location === '';
 
   if (!farm || isPlaceholder) {
-    if (!farm) {
-      let inviteCheck: { success?: boolean; membership?: unknown } | null =
-        null;
-      try {
-        inviteCheck = await acceptInvitation(false);
-      } catch (error) {
-        console.error('[DashboardLayout] Invitation check failed:', error);
-      }
-
-      // Only reload when a membership was actually created — a bare
-      // success:true stub previously caused ERR_TOO_MANY_REDIRECTS.
-      if (inviteCheck?.success && inviteCheck.membership) {
-        redirect('/dashboard');
-      }
-    }
-
     if (me.role === 'OWNER') {
       redirect('/onboarding');
     }
@@ -76,10 +61,10 @@ export default async function DashboardLayout({
            </div>
            <h2 className="text-2xl font-bold mb-3 uppercase tracking-widest text-red-400">Access Restricted</h2>
            <p className="opacity-70 leading-relaxed font-medium mb-6">
-             You are not currently linked to any farm. We checked for invitations sent to <span className="text-emerald-400 font-bold underline">{identifier}</span>.
+             You are not currently linked to any farm. Ask your farm administrator to add you using the email or phone number on this account: <span className="text-emerald-400 font-bold underline">{identifier}</span>.
            </p>
            <p className="text-xs text-white/40 italic">
-             Please contact your farm administrator to verify which email or phone number was used for your invitation.
+             If you were just invited, sign in with the phone number or email your administrator used and the temporary password they shared with you.
            </p>
            <div className="mt-8">
               <Link href="/login" className="text-emerald-400 font-bold uppercase tracking-widest text-xs hover:underline">

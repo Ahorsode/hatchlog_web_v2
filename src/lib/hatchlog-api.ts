@@ -594,21 +594,6 @@ export async function resetTeamMemberPermissionsApi(
     query: { farm_id: farmId },
   })
 }
-
-export async function acceptTeamInvitationApi(body: Record<string, unknown>) {
-  return requestJson('/api/v1/team/invitations/accept', {
-    method: 'POST',
-    body,
-  })
-}
-
-export async function getTeamInviteUserApi(inviteId: string, farmId: string) {
-  return requestJson(`/api/v1/team/invitations/${inviteId}/user`, {
-    method: 'GET',
-    query: { farm_id: farmId },
-  })
-}
-
 // --- Inventory ---
 
 export async function listInventory(

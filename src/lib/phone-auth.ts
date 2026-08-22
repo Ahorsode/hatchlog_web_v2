@@ -1,4 +1,5 @@
-/** Shared first-login password for workers invited via web, desktop, or mobile. */
+/** Shared first-login password for workers invited via web, desktop, or mobile.
+ * Keep in sync with hatchlog_backend/src/team/team.constants.ts (WORKER_PLACEHOLDER_PASSWORD). */
 export const WORKER_PLACEHOLDER_PASSWORD = '123456'
 
 export function normalizePhoneNumber(phone: string | null | undefined): string | null {
