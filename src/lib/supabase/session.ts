@@ -28,37 +28,33 @@ export const getAppSessionUser = cache(async (): Promise<AppAuthUser | null> => 
 
   if (!supabaseUser) return null
 
-  try {
-    const me = (await hatchlogMe()) as {
-      id: string
-      email?: string | null
-      phoneNumber?: string | null
-      role?: string
-      mustChangePassword?: boolean
-      sessionVersion?: number
-      securityInvalidated?: boolean
-      securityNotice?: string | null
-      activeFarmId?: string | null
-      firstname?: string | null
-      surname?: string | null
-    }
+  const me = (await hatchlogMe()) as {
+    id: string
+    email?: string | null
+    phoneNumber?: string | null
+    role?: string
+    mustChangePassword?: boolean
+    sessionVersion?: number
+    securityInvalidated?: boolean
+    securityNotice?: string | null
+    activeFarmId?: string | null
+    firstname?: string | null
+    surname?: string | null
+  }
 
-    if (!me?.id) return null
+  if (!me?.id) return null
 
-    return {
-      id: me.id,
-      email: me.email ?? null,
-      phoneNumber: me.phoneNumber ?? null,
-      role: me.role ?? 'WORKER',
-      mustChangePassword: me.mustChangePassword ?? false,
-      sessionVersion: me.sessionVersion ?? 1,
-      securityInvalidated: Boolean(me.securityInvalidated),
-      securityNotice: me.securityNotice ?? null,
-      activeFarmId: me.activeFarmId ?? undefined,
-      name: [me.firstname, me.surname].filter(Boolean).join(' ') || null,
-    }
-  } catch {
-    return null
+  return {
+    id: me.id,
+    email: me.email ?? null,
+    phoneNumber: me.phoneNumber ?? null,
+    role: me.role ?? 'WORKER',
+    mustChangePassword: me.mustChangePassword ?? false,
+    sessionVersion: me.sessionVersion ?? 1,
+    securityInvalidated: Boolean(me.securityInvalidated),
+    securityNotice: me.securityNotice ?? null,
+    activeFarmId: me.activeFarmId ?? undefined,
+    name: [me.firstname, me.surname].filter(Boolean).join(' ') || null,
   }
 })
 

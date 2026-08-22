@@ -5,7 +5,7 @@ import { SidebarWrapper } from '@/components/layout/SidebarWrapper';
 import { resolveFarmNavigationRole } from '@/lib/navigation-permissions';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { hatchlogMe, hatchlogFarms } from '@/lib/hatchlog-api';
+import { hatchlogMe, hatchlogFarms, isHatchlogApiUnavailable } from '@/lib/hatchlog-api';
 import { getFarmSubscriptionStatus } from '@/lib/subscription-utils';
 import { LockedFarmShell } from './LockedFarmShell';
 
@@ -14,8 +14,18 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const sessionUser = await getAppSessionUser();
-  
+  let sessionUser: Awaited<ReturnType<typeof getAppSessionUser>> = null;
+  try {
+    sessionUser = await getAppSessionUser();
+  } catch (error) {
+    console.error('[DashboardLayout] session resolve failed:', error);
+    redirect(
+      isHatchlogApiUnavailable(error)
+        ? '/api/auth/force-login?error=db'
+        : '/api/auth/force-login?error=user_not_found',
+    );
+  }
+
   if (!sessionUser?.id) {
     // Clear orphan Supabase cookies so middleware does not loop /login ↔ /dashboard.
     redirect('/api/auth/force-login?error=user_not_found');

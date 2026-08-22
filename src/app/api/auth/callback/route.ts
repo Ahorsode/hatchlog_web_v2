@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import {
   hatchlogBootstrapProfile,
   hatchlogProfileByIdentity,
+  isHatchlogApiUnavailable,
 } from '@/lib/hatchlog-api'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
 
   if (!supabaseUser?.email) {
     console.error('[auth/callback] Supabase user missing email after OAuth')
+    await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/login?error=user_not_found`)
   }
 
@@ -46,25 +48,31 @@ export async function GET(request: Request) {
     if (!profile) {
       const bootstrapped = await hatchlogBootstrapProfile({
         email,
-        firstname: firstname || '',
-        surname: rest.join(' ') || '',
+        ...(firstname ? { firstname } : {}),
+        ...(rest.length > 0 ? { surname: rest.join(' ') } : {}),
       })
 
       if (!bootstrapped?.userId) {
-        throw new Error('Bootstrap returned no userId')
+        throw new Error('PROFILE_MISSING')
       }
 
       profile = await hatchlogProfileByIdentity(email)
     }
 
     if (!profile?.id) {
-      throw new Error(`No HatchLog profile after bootstrap for ${email}`)
+      throw new Error('PROFILE_MISSING')
     }
   } catch (err) {
     console.error('[auth/callback] Profile bootstrap/lookup failed:', err)
     // Clear half-open Supabase session so middleware does not bounce.
     await supabase.auth.signOut()
-    return NextResponse.redirect(`${origin}/login?error=user_not_found`)
+    const errorCode =
+      err instanceof Error && err.message === 'PROFILE_MISSING'
+        ? 'user_not_found'
+        : isHatchlogApiUnavailable(err)
+          ? 'backend_unreachable'
+          : 'db'
+    return NextResponse.redirect(`${origin}/login?error=${errorCode}`)
   }
 
   return NextResponse.redirect(`${origin}${next}`)

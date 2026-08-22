@@ -43,6 +43,15 @@ export function isHatchlogApiConfigured() {
   return Boolean(apiBaseUrl())
 }
 
+/** True when Nest is down, mis-routed, timed out, or returned 5xx — not a 4xx/not-found. */
+export function isHatchlogApiUnavailable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/No HatchLog user profile found/i.test(message)) return false
+  return /failed \(unreachable\)|fetch failed|Failed to fetch|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|UND_ERR_|abort|timed?\s*out|failed \(5\d\d\)/i.test(
+    message,
+  )
+}
+
 async function resolveAuthHeaders(
   userId?: string,
   accessToken?: string | null,
@@ -117,12 +126,20 @@ async function requestJson<T>(
     headers = await resolveAuthHeaders(options.userId, options.accessToken)
   }
 
-  const response = await fetch(url, {
-    method: options.method || 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    cache: 'no-store',
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: 'no-store',
+    })
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `HatchLog API ${options.method || 'GET'} ${path} failed (unreachable): ${reason}`,
+    )
+  }
 
   if (!response.ok) {
     const text = await response.text()

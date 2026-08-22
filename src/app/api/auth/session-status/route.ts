@@ -4,19 +4,19 @@ import { SECURITY_PERMISSION_UPDATE_MESSAGE } from '@/lib/auth-utils'
 import { hatchlogProfileByIdentity } from '@/lib/hatchlog-api'
 
 export async function GET() {
-  const sessionUser = await getAppSessionUser()
-  if (!sessionUser?.id) {
-    return NextResponse.json({ authenticated: false }, { status: 401 })
-  }
-
   try {
+    const sessionUser = await getAppSessionUser()
+    if (!sessionUser?.id) {
+      return NextResponse.json({ authenticated: false })
+    }
+
     const user = await hatchlogProfileByIdentity(
       sessionUser.email || undefined,
       sessionUser.phoneNumber || undefined,
     )
 
     if (!user) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+      return NextResponse.json({ authenticated: false })
     }
 
     const revoked =
@@ -29,6 +29,6 @@ export async function GET() {
       message: revoked ? SECURITY_PERMISSION_UPDATE_MESSAGE : null,
     })
   } catch {
-    return NextResponse.json({ authenticated: true, revoked: false, message: null })
+    return NextResponse.json({ authenticated: false })
   }
 }

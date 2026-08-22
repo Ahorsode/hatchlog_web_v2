@@ -51,6 +51,7 @@ export function SecuritySessionWatcher() {
       if (response.status === 401) return;
 
       const payload = await response.json();
+      if (!payload?.authenticated) return;
       if (payload?.revoked) {
         await forceSignOut(payload.message || DEFAULT_NOTICE);
       }
@@ -60,6 +61,9 @@ export function SecuritySessionWatcher() {
   }, [forceSignOut]);
 
   useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/login') || path.startsWith('/signup')) return;
+
     void checkSession();
     const interval = window.setInterval(() => void checkSession(), 15_000);
 

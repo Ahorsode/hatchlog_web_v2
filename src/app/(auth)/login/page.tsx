@@ -25,9 +25,11 @@ export default function LoginPage() {
     const authError = searchParams.get('error');
     if (authError === 'oauth' || authError === 'OAuthAccountNotLinked') {
       setError('Google sign-in failed. Please try again or contact your farm administrator.');
+    } else if (authError === 'backend_unreachable') {
+      setError("Couldn't reach the farm server — please try again in a moment.");
     } else if (authError === 'db') {
       setError(
-        'Signed in with Google, but the farm API rejected the session. Check Nest SUPABASE_JWT_SECRET / JWKS and HATCHLOG_API_URL, then try again.',
+        'Google signed you in, but HatchLog could not reach the farm API. Try again in a moment, or contact support if this continues.',
       );
     } else if (authError === 'user_not_found') {
       setError(
@@ -143,7 +145,10 @@ export default function LoginPage() {
                         <Phone className="w-5 h-5 text-white/70 group-focus-within/input:text-emerald-400 transition-colors" />
                       </div>
                       <input
+                        id="phoneNumber"
+                        name="phoneNumber"
                         type="tel"
+                        autoComplete="tel"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         placeholder="+233 54 000 0000"
@@ -158,7 +163,10 @@ export default function LoginPage() {
                         <Lock className="w-5 h-5 text-white/70 group-focus-within/input:text-emerald-400 transition-colors" />
                       </div>
                       <input
+                        id="password"
+                        name="password"
                         type="password"
+                        autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••"

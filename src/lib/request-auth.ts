@@ -11,9 +11,13 @@ function getBearerToken(request: Request) {
 }
 
 export async function getRequestUserId(request: Request): Promise<string | null> {
-  const sessionUser = await getAppSessionUser()
-  if (sessionUser?.id) {
-    return sessionUser.id
+  try {
+    const sessionUser = await getAppSessionUser()
+    if (sessionUser?.id) {
+      return sessionUser.id
+    }
+  } catch {
+    // Nest /me can be down while a Supabase cookie still exists.
   }
 
   void getBearerToken(request)
